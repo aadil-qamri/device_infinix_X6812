@@ -39,7 +39,7 @@ jobs:
     - name: Clone Device Tree
       run: |
         cd twrp
-        git clone https://github.com/modking0091-netizen/device_infinix_x6812-aosp.git -b master device/infinix/X6812
+        git clone https://github.com/aadil-qamri/device_infinix_X6812.git -b master device/infinix/X6812
 
     - name: Build Recovery Image
       run: |
