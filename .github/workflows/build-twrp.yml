@@ -1,0 +1,54 @@
+name: Build TWRP Recovery
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Free Disk Space
+      run: |
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo apt-get clean
+        df -h
+
+    - name: Set up Build Environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y git-core gnupg flex bison build-essential zip curl zlib1g-dev \
+          gcc-multilib g++-multilib libc6-dev-i386 libncurses5 lib32ncurses5-dev x11proto-core-dev \
+          libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip fontconfig python3
+
+    - name: Install Repo Tool
+      run: |
+        mkdir -p ~/bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/bin/repo
+        chmod a+x ~/bin/repo
+        sudo ln -sf ~/bin/repo /usr/bin/repo
+
+    - name: Initialize Recovery Source
+      run: |
+        mkdir twrp && cd twrp
+        git config --global user.name "Builder"
+        git config --global user.email "build@local"
+        repo init --depth=1 -u https://github.com/minimal-manifest-twrp/platform_manifest_twrp_omni.git -b twrp-11
+        repo sync -c --no-clone-bundle --no-tags -j$(nproc --all)
+
+    - name: Clone Device Tree
+      run: |
+        cd twrp
+        git clone https://github.com/modking0091-netizen/device_infinix_x6812-aosp.git -b master device/infinix/X6812
+
+    - name: Build Recovery Image
+      run: |
+        cd twrp
+        source build/envsetup.sh
+        lunch omni_X6812-eng || lunch twrp_X6812-eng
+        mka recoveryimage -j$(nproc --all)
+
+    - name: Upload Recovery Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: TWRP-X6812-Image
+        path: twrp/out/target/product/X6812/recovery.img
