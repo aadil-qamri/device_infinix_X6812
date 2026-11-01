@@ -11,6 +11,12 @@ on fs
     mkdir /mnt/vendor/nvcfg 0700 root root
     mkdir /mnt/vendor/persist 0700 root root
 
+    mount ext4 /dev/block/by-name/protect1 /mnt/vendor/protect_f noatime nosuid nodev wait
+    mount ext4 /dev/block/by-name/protect2 /mnt/vendor/protect_s noatime nosuid nodev wait
+    mount ext4 /dev/block/by-name/persist /mnt/vendor/persist noatime nosuid nodev wait
+    mount ext4 /dev/block/by-name/nvdata /mnt/vendor/nvdata noatime nosuid nodev wait
+    mount ext4 /dev/block/by-name/nvcfg /mnt/vendor/nvcfg noatime nosuid nodev wait
+
     install_keyring
 
 service keystore_auth /system/bin/keystore_auth
@@ -44,13 +50,13 @@ service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service.beanpod
     user root
     group root drmrpc
     disabled
-    oneshot
     seclabel u:r:recovery:s0
 
 on property:vendor.sys.listener.registered=true
     start gatekeeper-1-0
     
 on property:hwservicemanager.ready=true
+    start teei_daemon
     start keymaster-4-0
     start gatekeeper-1-0
    
