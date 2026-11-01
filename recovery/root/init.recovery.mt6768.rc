@@ -4,6 +4,28 @@ on init
     export LD_LIBRARY_PATH /system/lib64:/vendor/lib64:/vendor/lib64/hw:/system/lib64/hw
 
 on fs
+    install_keyring
+
+on post-fs
+    # Support A/B feature for EMMC boot region
+    symlink /dev/block/mmcblk0boot0 /dev/block/platform/bootdevice/by-name/preloader_a
+    symlink /dev/block/mmcblk0boot1 /dev/block/platform/bootdevice/by-name/preloader_b
+
+    # Fix OF installer
+    symlink /dev/block/platform/bootdevice /dev/block/bootdevice
+
+    # Support A/B feature for combo emmc OTA update
+    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/platform/bootdevice/by-name/preloader_emmc_a
+    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/platform/bootdevice/by-name/preloader_emmc_b
+
+    # Support A/B feature for combo emmc OTA update
+    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/by-name/preloader_emmc_a
+    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/by-name/preloader_emmc_b
+
+    exec u:r:update_engine:s0 root root -- /system/bin/mtk_plpath_utils
+    start mtk.plpath.utils.link
+
+    # Create mountpoints
     mkdir /mnt/vendor 0700 root root
     mkdir /mnt/vendor/protect_f 0700 root root
     mkdir /mnt/vendor/protect_s 0700 root root
@@ -11,13 +33,16 @@ on fs
     mkdir /mnt/vendor/nvcfg 0700 root root
     mkdir /mnt/vendor/persist 0700 root root
 
+    # Mount security partitions after symlinks are created
     mount ext4 /dev/block/by-name/protect1 /mnt/vendor/protect_f noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/protect2 /mnt/vendor/protect_s noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/persist /mnt/vendor/persist noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/nvdata /mnt/vendor/nvdata noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/nvcfg /mnt/vendor/nvcfg noatime nosuid nodev wait
 
-    install_keyring
+    # Keystore directory
+    mkdir /tmp/misc 0777 root root
+    mkdir /tmp/misc/keystore 0700 root root
 
 service keystore_auth /system/bin/keystore_auth
     user system
@@ -52,48 +77,30 @@ service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service.beanpod
     disabled
     seclabel u:r:recovery:s0
 
-on property:vendor.sys.listener.registered=true
-    start gatekeeper-1-0
-    
+# 1. Start TEE daemon when service manager is ready
 on property:hwservicemanager.ready=true
     start teei_daemon
+
+# 2. Only start Keymaster & Gatekeeper once TEE listener reports ready
+on property:vendor.sys.listener.registered=true
     start keymaster-4-0
     start gatekeeper-1-0
-   
+
 on property:ro.crypto.state=unsupported
     stop teei_daemon
     stop keymaster-4-0
     stop gatekeeper-1-0
-    
+
 on property:ro.crypto.state=unencrypted
     stop teei_daemon
     stop keymaster-4-0
     stop gatekeeper-1-0
-        
+
 on property:twrp.all.users.decrypted=true
     stop teei_daemon
     stop keymaster-4-0
     stop gatekeeper-1-0
 
-on post-fs
-    # Support A/B feature for EMMC boot region
-    symlink /dev/block/mmcblk0boot0 /dev/block/platform/bootdevice/by-name/preloader_a
-    symlink /dev/block/mmcblk0boot1 /dev/block/platform/bootdevice/by-name/preloader_b
-
-    # Fix OF installer
-    symlink /dev/block/platform/bootdevice /dev/block/bootdevice
-
-    # Support A/B feature for combo emmc OTA update
-    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/platform/bootdevice/by-name/preloader_emmc_a
-    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/platform/bootdevice/by-name/preloader_emmc_b
-
-    # Support A/B feature for combo emmc OTA update
-    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/by-name/preloader_emmc_a
-    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/by-name/preloader_emmc_b
-
-    exec u:r:update_engine:s0 root root -- /system/bin/mtk_plpath_utils
-    start mtk.plpath.utils.link
-   
 on boot
     start boot-hal-1-1
     start health-hal-2-1
