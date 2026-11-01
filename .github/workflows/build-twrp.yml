@@ -47,10 +47,10 @@ jobs:
         export ALLOW_MISSING_DEPENDENCIES=true
         source build/envsetup.sh
         lunch twrp_X6812-eng
-        mka recoveryimage -j$(nproc --all)
+        mka bootimage -j$(nproc --all)
 
     - name: Upload Recovery Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: TWRP-X6812-Image
-        path: twrp/out/target/product/X6812/recovery.img
+        name: TWRP-X6812-Boot
+        path: twrp/out/target/product/X6812/boot.img
