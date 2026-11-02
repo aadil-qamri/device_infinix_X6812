@@ -66,23 +66,22 @@ service mtk.plpath.utils.link /system/bin/mtk_plpath_utils
     seclabel u:r:recovery:s0
 
 service gatekeeper-1-0 /system/bin/android.hardware.gatekeeper@1.0-service
+    interface android.hardware.gatekeeper@1.0::IGatekeeper default
     user root
     group root
     disabled
     seclabel u:r:recovery:s0
 
 service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service.beanpod
+    interface android.hardware.keymaster@4.0::IKeymasterDevice default
     user root
     group root drmrpc
     disabled
     seclabel u:r:recovery:s0
 
-# 1. Start TEE daemon when service manager is ready
+# 1. Start All Three
 on property:hwservicemanager.ready=true
     start teei_daemon
-
-# 2. Only start Keymaster & Gatekeeper once TEE listener reports ready
-on property:vendor.sys.listener.registered=true
     start keymaster-4-0
     start gatekeeper-1-0
 
