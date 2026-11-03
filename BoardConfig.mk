@@ -137,7 +137,7 @@ BOARD_USES_MTK_HARDWARE := true
 
 ## TWRP-Specific configuration
 TW_THEME := portrait_hdpi
-TW_DEVICE_VERSION := Jprimero15_build
+TW_DEVICE_VERSION := X6812
 RECOVERY_SDCARD_ON_DATA := true
 TARGET_USES_MKE2FS := true
 TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
@@ -156,6 +156,10 @@ TW_SCREEN_BLANK_ON_BOOT := true
 TW_INCLUDE_RESETPROP := true
 TW_INCLUDE_REPACKTOOLS := true
 TW_HAS_MTP := true
+TW_INCLUDE_CRYPTO := true
+TW_INCLUDE_CRYPTO_FBE := true
+TW_INCLUDE_FBE_METADATA_DECRYPT := true
+TW_USE_FSCRYPT_POLICY := 2
 
 # Debug
 TWRP_INCLUDE_LOGCAT := true
