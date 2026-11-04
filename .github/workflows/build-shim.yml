@@ -18,7 +18,7 @@ jobs:
       - name: Verify Linker Dependencies
         run: |
           readelf -d libteec_shim.so | grep NEEDED
-          strings libteec_shim.so | grep -i SharedMemory
+          nm -D libteec_shim.so
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
