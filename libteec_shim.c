@@ -53,9 +53,34 @@ int ioctl(int fd, int request, ...) {
     void* argp = va_arg(args, void*);
     va_end(args);
 
+    unsigned int u_req = (unsigned int)request;
+
+    /* Intercept TEE_IOC_SHM_ALLOC (0xc010a401) */
+    if (u_req == 0xc010a401 && argp) {
+        uint64_t *p64 = (uint64_t *)argp;
+        uint32_t *p32 = (uint32_t *)argp;
+
+        char msg[160];
+        snprintf(msg, sizeof(msg), "SHM_ALLOC in: size=%llu flags=0x%x id=%d",
+                 (unsigned long long)p64[0], p32[2], p32[3]);
+        klog(msg);
+
+        /* Kernel 4.14 tee_ioctl_shm_alloc rejects non-zero flags with -EINVAL */
+        if (p32[2] != 0) {
+            snprintf(msg, sizeof(msg), "Zeroing flags 0x%x -> 0", p32[2]);
+            klog(msg);
+            p32[2] = 0;
+        }
+
+        int ret = real_ioctl(fd, request, argp);
+        snprintf(msg, sizeof(msg), "ioctl(0x%x) ret=%d errno=%d (%s) res_id=%d",
+                 u_req, ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK", p32[3]);
+        klog(msg);
+        return ret;
+    }
+
     int ret = real_ioctl(fd, request, argp);
 
-    unsigned int u_req = (unsigned int)request;
     if ((u_req & 0xFF00) == 0xA400 || (u_req & 0xFF) == 0xA4) {
         char msg[128];
         snprintf(msg, sizeof(msg), "ioctl(0x%x) ret=%d errno=%d (%s)",
@@ -107,7 +132,6 @@ TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* 
     int is_tagged = ((raw_addr >> 56) != 0);
     int is_unaligned = ((raw_addr & 4095) != 0);
 
-    /* If pointer is untagged and page-aligned, let real driver handle it directly */
     if (!is_tagged && !is_unaligned) {
         if (real_TEEC_RegisterSharedMemory) {
             return real_TEEC_RegisterSharedMemory(context, sharedMem);
@@ -121,7 +145,6 @@ TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* 
         return TEEC_ERROR_OUT_OF_MEMORY;
     }
 
-    /* Guarantee no upper tag bits exist */
     clean_buf = (void*)((uintptr_t)clean_buf & 0x00FFFFFFFFFFFFFFULL);
 
     void* orig_buf = sharedMem->buffer;
