@@ -30,6 +30,14 @@ typedef struct {
 
 typedef uint32_t TEEC_Result;
 
+/* Beanpod TEE registration ioctl struct */
+struct beanpod_shm_reg_data {
+    uint64_t addr;
+    uint64_t size;
+    uint32_t flags;
+    int32_t  id;
+};
+
 static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
 static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
@@ -55,26 +63,35 @@ int ioctl(int fd, int request, ...) {
 
     unsigned int u_req = (unsigned int)request;
 
-    /* Intercept TEE_IOC_SHM_ALLOC (0xc010a401) */
+    /* Intercept Beanpod TEE_IOC_SHM_REGISTER (0xc010a401) */
     if (u_req == 0xc010a401 && argp) {
-        uint64_t *p64 = (uint64_t *)argp;
-        uint32_t *p32 = (uint32_t *)argp;
+        struct beanpod_shm_reg_data *reg = (struct beanpod_shm_reg_data *)argp;
 
         char msg[160];
-        snprintf(msg, sizeof(msg), "SHM_ALLOC in: size=%llu flags=0x%x id=%d",
-                 (unsigned long long)p64[0], p32[2], p32[3]);
+        snprintf(msg, sizeof(msg), "SHM_REG raw: addr=0x%llx size=%llu flags=0x%x id=%d",
+                 (unsigned long long)reg->addr,
+                 (unsigned long long)reg->size,
+                 reg->flags,
+                 reg->id);
         klog(msg);
 
-        /* Kernel 4.14 tee_ioctl_shm_alloc rejects non-zero flags with -EINVAL */
-        if (p32[2] != 0) {
-            snprintf(msg, sizeof(msg), "Zeroing flags 0x%x -> 0", p32[2]);
+        /* Strip any top-byte tagging from the address */
+        uint64_t clean_addr = reg->addr & 0x00FFFFFFFFFFFFFFULL;
+        if (clean_addr != reg->addr) {
+            snprintf(msg, sizeof(msg), "Untagged addr: 0x%llx -> 0x%llx",
+                     (unsigned long long)reg->addr, (unsigned long long)clean_addr);
             klog(msg);
-            p32[2] = 0;
+            reg->addr = clean_addr;
+        }
+
+        /* Ensure flags don't trigger kernel validation rejections */
+        if (reg->flags != 0) {
+            reg->flags = 0;
         }
 
         int ret = real_ioctl(fd, request, argp);
-        snprintf(msg, sizeof(msg), "ioctl(0x%x) ret=%d errno=%d (%s) res_id=%d",
-                 u_req, ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK", p32[3]);
+        snprintf(msg, sizeof(msg), "SHM_REG res: ret=%d errno=%d (%s) assigned_id=%d",
+                 ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK", reg->id);
         klog(msg);
         return ret;
     }
