@@ -5,19 +5,17 @@
 #include <dlfcn.h>
 #include <stdint.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/ioctl.h>
 
 #define TEEC_SUCCESS               0x00000000
 #define TEEC_ERROR_BAD_PARAMETERS   0xFFFF0006
 #define TEEC_ERROR_OUT_OF_MEMORY   0xFFFF000C
-#define TEEC_MEM_INPUT             0x00000001
-#define TEEC_MEM_OUTPUT            0x00000002
 
 typedef struct {
     void* buffer;
     size_t size;
     uint32_t flags;
-    uint32_t ops;
-    uint64_t dummy;
 } TEEC_SharedMemory;
 
 typedef struct {
@@ -28,6 +26,8 @@ typedef uint32_t TEEC_Result;
 
 static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
+static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
+static int (*real_ioctl)(int, unsigned long, ...) = NULL;
 
 static void klog(const char* msg) {
     FILE* fp = fopen("/dev/kmsg", "w");
@@ -37,6 +37,29 @@ static void klog(const char* msg) {
     }
 }
 
+/* Intercept ioctl calls from libTEECommon to /dev/isee_tee0 */
+int ioctl(int fd, unsigned long request, ...) {
+    if (!real_ioctl) {
+        real_ioctl = dlsym(RTLD_NEXT, "ioctl");
+    }
+
+    va_list args;
+    va_start(args, request);
+    void* argp = va_arg(args, void*);
+    va_end(args);
+
+    int ret = real_ioctl(fd, request, argp);
+
+    /* Log Beanpod TEE ioctl commands (Magic 0xA4) */
+    if ((request & 0xFF00) == 0xA400 || (request & 0xFF) == 0xA4) {
+        char msg[128];
+        snprintf(msg, sizeof(msg), "ioctl(0x%lx) ret=%d errno=%d (%s)",
+                 request, ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK");
+        klog(msg);
+    }
+    return ret;
+}
+
 static void init_real(void) {
     if (!real_TEEC_AllocateSharedMemory) {
         void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
@@ -44,6 +67,7 @@ static void init_real(void) {
         if (handle) {
             real_TEEC_AllocateSharedMemory = dlsym(handle, "TEEC_AllocateSharedMemory");
             real_TEEC_ReleaseSharedMemory = dlsym(handle, "TEEC_ReleaseSharedMemory");
+            real_TEEC_RegisterSharedMemory = dlsym(handle, "TEEC_RegisterSharedMemory");
             klog("Hooked real libTEECommon functions");
         } else {
             klog("FAILED to dlopen libTEECommon.so");
@@ -51,85 +75,45 @@ static void init_real(void) {
     }
 }
 
-#define MAX_TRACKED 8
-static struct {
-    void* orig_buf;
-    TEEC_SharedMemory allocated_shm;
-} g_tracked[MAX_TRACKED];
-
 TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
+    if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
+
+    char msg[128];
+    snprintf(msg, sizeof(msg), "TEEC_AllocateSharedMemory req: size=%zu, flags=0x%x",
+             sharedMem->size, sharedMem->flags);
+    klog(msg);
+
     if (real_TEEC_AllocateSharedMemory) {
-        return real_TEEC_AllocateSharedMemory(context, sharedMem);
+        TEEC_Result res = real_TEEC_AllocateSharedMemory(context, sharedMem);
+        snprintf(msg, sizeof(msg), "real_TEEC_AllocateSharedMemory res=0x%x buf=%p", res, sharedMem->buffer);
+        klog(msg);
+        return res;
     }
     return TEEC_ERROR_BAD_PARAMETERS;
 }
 
 TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
-    char log_buf[128];
+    if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
 
-    if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
-        return TEEC_ERROR_BAD_PARAMETERS;
+    char msg[128];
+    snprintf(msg, sizeof(msg), "TEEC_RegisterSharedMemory req: buf=%p, size=%zu, flags=0x%x",
+             sharedMem->buffer, sharedMem->size, sharedMem->flags);
+    klog(msg);
+
+    if (real_TEEC_RegisterSharedMemory) {
+        TEEC_Result res = real_TEEC_RegisterSharedMemory(context, sharedMem);
+        snprintf(msg, sizeof(msg), "real_TEEC_RegisterSharedMemory res=0x%x", res);
+        klog(msg);
+        return res;
     }
-
-    if (!real_TEEC_AllocateSharedMemory) {
-        klog("real_TEEC_AllocateSharedMemory is NULL");
-        return TEEC_ERROR_OUT_OF_MEMORY;
-    }
-
-    void* orig_buffer = sharedMem->buffer;
-    size_t orig_size = sharedMem->size;
-
-    TEEC_SharedMemory drv_shm;
-    memset(&drv_shm, 0, sizeof(drv_shm));
-    drv_shm.size = orig_size;
-    drv_shm.flags = sharedMem->flags | TEEC_MEM_INPUT | TEEC_MEM_OUTPUT;
-
-    TEEC_Result res = real_TEEC_AllocateSharedMemory(context, &drv_shm);
-    snprintf(log_buf, sizeof(log_buf), "real_TEEC_AllocateSharedMemory returned: 0x%08x, buf=%p", res, drv_shm.buffer);
-    klog(log_buf);
-
-    if (res != TEEC_SUCCESS || !drv_shm.buffer) {
-        return res != TEEC_SUCCESS ? res : TEEC_ERROR_OUT_OF_MEMORY;
-    }
-
-    memcpy(drv_shm.buffer, orig_buffer, orig_size);
-
-    for (int i = 0; i < MAX_TRACKED; i++) {
-        if (!g_tracked[i].orig_buf) {
-            g_tracked[i].orig_buf = orig_buffer;
-            g_tracked[i].allocated_shm = drv_shm;
-            break;
-        }
-    }
-
-    *sharedMem = drv_shm;
-    return TEEC_SUCCESS;
+    return TEEC_ERROR_BAD_PARAMETERS;
 }
 
 void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
     init_real();
-    if (!sharedMem || !sharedMem->buffer) return;
-
-    int idx = -1;
-    for (int i = 0; i < MAX_TRACKED; i++) {
-        if (g_tracked[i].allocated_shm.buffer == sharedMem->buffer) {
-            idx = i;
-            break;
-        }
-    }
-
-    if (idx != -1 && g_tracked[idx].orig_buf) {
-        memcpy(g_tracked[idx].orig_buf, sharedMem->buffer, g_tracked[idx].allocated_shm.size);
-        if (real_TEEC_ReleaseSharedMemory) {
-            real_TEEC_ReleaseSharedMemory(&g_tracked[idx].allocated_shm);
-        }
-        sharedMem->buffer = g_tracked[idx].orig_buf;
-        memset(&g_tracked[idx], 0, sizeof(g_tracked[idx]));
-    } else {
-        if (real_TEEC_ReleaseSharedMemory) {
-            real_TEEC_ReleaseSharedMemory(sharedMem);
-        }
+    if (sharedMem && real_TEEC_ReleaseSharedMemory) {
+        real_TEEC_ReleaseSharedMemory(sharedMem);
     }
 }
