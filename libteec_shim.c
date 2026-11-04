@@ -10,45 +10,45 @@
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 
-#define TEEC_SUCCESS               0x00000000
-#define TEEC_ERROR_BAD_PARAMETERS   0xFFFF0006
-#define TEEC_ERROR_OUT_OF_MEMORY   0xFFFF000C
-#define TEEC_MEM_INPUT             0x00000001
-#define TEEC_MEM_OUTPUT            0x00000002
-
-typedef struct {
-    void* buffer;
-    size_t size;
-    uint32_t flags;
-    uint32_t ops;
-    uint64_t dummy;
-} TEEC_SharedMemory;
-
-typedef struct {
-    int fd;
-} TEEC_Context;
-
-typedef uint32_t TEEC_Result;
-
-/* Beanpod TEE registration ioctl struct */
-struct beanpod_shm_reg_data {
-    uint64_t addr;
-    uint64_t size;
-    uint32_t flags;
-    int32_t  id;
-};
-
-static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
-static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
-static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
-static int (*real_ioctl)(int, int, ...) = NULL;
-
 static void klog(const char* msg) {
     FILE* fp = fopen("/dev/kmsg", "w");
     if (fp) {
         fprintf(fp, "[teec_shim] %s\n", msg);
         fclose(fp);
     }
+}
+
+static void* (*real_mmap)(void*, size_t, int, int, int, off_t) = NULL;
+static int (*real_ioctl)(int, int, ...) = NULL;
+
+void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset) {
+    if (!real_mmap) {
+        real_mmap = dlsym(RTLD_NEXT, "mmap");
+    }
+
+    void* res = real_mmap(addr, length, prot, flags, fd, offset);
+
+    /* Log device mappings */
+    if (fd >= 0) {
+        char msg[160];
+        snprintf(msg, sizeof(msg), "mmap(fd=%d, len=%zu, prot=0x%x, flags=0x%x, off=%ld) -> %p (errno=%d %s)",
+                 fd, length, prot, flags, (long)offset, res,
+                 res == MAP_FAILED ? errno : 0,
+                 res == MAP_FAILED ? strerror(errno) : "OK");
+        klog(msg);
+
+        /* Fallback: if driver rejects device mmap, allocate anonymous shared memory */
+        if (res == MAP_FAILED && (flags & MAP_SHARED)) {
+            void* anon = real_mmap(NULL, length, prot, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+            snprintf(msg, sizeof(msg), "Fallback anonymous mmap -> %p", anon);
+            klog(msg);
+            if (anon != MAP_FAILED) {
+                return anon;
+            }
+        }
+    }
+
+    return res;
 }
 
 int ioctl(int fd, int request, ...) {
@@ -61,43 +61,9 @@ int ioctl(int fd, int request, ...) {
     void* argp = va_arg(args, void*);
     va_end(args);
 
-    unsigned int u_req = (unsigned int)request;
-
-    /* Intercept Beanpod TEE_IOC_SHM_REGISTER (0xc010a401) */
-    if (u_req == 0xc010a401 && argp) {
-        struct beanpod_shm_reg_data *reg = (struct beanpod_shm_reg_data *)argp;
-
-        char msg[160];
-        snprintf(msg, sizeof(msg), "SHM_REG raw: addr=0x%llx size=%llu flags=0x%x id=%d",
-                 (unsigned long long)reg->addr,
-                 (unsigned long long)reg->size,
-                 reg->flags,
-                 reg->id);
-        klog(msg);
-
-        /* Strip any top-byte tagging from the address */
-        uint64_t clean_addr = reg->addr & 0x00FFFFFFFFFFFFFFULL;
-        if (clean_addr != reg->addr) {
-            snprintf(msg, sizeof(msg), "Untagged addr: 0x%llx -> 0x%llx",
-                     (unsigned long long)reg->addr, (unsigned long long)clean_addr);
-            klog(msg);
-            reg->addr = clean_addr;
-        }
-
-        /* Ensure flags don't trigger kernel validation rejections */
-        if (reg->flags != 0) {
-            reg->flags = 0;
-        }
-
-        int ret = real_ioctl(fd, request, argp);
-        snprintf(msg, sizeof(msg), "SHM_REG res: ret=%d errno=%d (%s) assigned_id=%d",
-                 ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK", reg->id);
-        klog(msg);
-        return ret;
-    }
-
     int ret = real_ioctl(fd, request, argp);
 
+    unsigned int u_req = (unsigned int)request;
     if ((u_req & 0xFF00) == 0xA400 || (u_req & 0xFF) == 0xA4) {
         char msg[128];
         snprintf(msg, sizeof(msg), "ioctl(0x%x) ret=%d errno=%d (%s)",
@@ -105,121 +71,4 @@ int ioctl(int fd, int request, ...) {
         klog(msg);
     }
     return ret;
-}
-
-static void init_real(void) {
-    if (!real_TEEC_RegisterSharedMemory) {
-        void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
-        if (!handle) handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
-        if (handle) {
-            real_TEEC_AllocateSharedMemory = dlsym(handle, "TEEC_AllocateSharedMemory");
-            real_TEEC_ReleaseSharedMemory = dlsym(handle, "TEEC_ReleaseSharedMemory");
-            real_TEEC_RegisterSharedMemory = dlsym(handle, "TEEC_RegisterSharedMemory");
-            klog("Hooked real libTEECommon functions");
-        } else {
-            klog("FAILED to dlopen libTEECommon.so");
-        }
-    }
-}
-
-#define MAX_TRACKED 8
-static struct {
-    void* orig_buf;
-    void* clean_buf;
-    size_t size;
-    size_t alloc_size;
-    uint32_t flags;
-} g_tracked[MAX_TRACKED];
-
-TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
-    init_real();
-    if (real_TEEC_AllocateSharedMemory) {
-        return real_TEEC_AllocateSharedMemory(context, sharedMem);
-    }
-    return TEEC_ERROR_BAD_PARAMETERS;
-}
-
-TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
-    init_real();
-    if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
-        return TEEC_ERROR_BAD_PARAMETERS;
-    }
-
-    uintptr_t raw_addr = (uintptr_t)sharedMem->buffer;
-    int is_tagged = ((raw_addr >> 56) != 0);
-    int is_unaligned = ((raw_addr & 4095) != 0);
-
-    if (!is_tagged && !is_unaligned) {
-        if (real_TEEC_RegisterSharedMemory) {
-            return real_TEEC_RegisterSharedMemory(context, sharedMem);
-        }
-    }
-
-    size_t alloc_size = (sharedMem->size + 4095) & ~4095;
-    void* clean_buf = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
-    if (clean_buf == MAP_FAILED) {
-        klog("mmap failed");
-        return TEEC_ERROR_OUT_OF_MEMORY;
-    }
-
-    clean_buf = (void*)((uintptr_t)clean_buf & 0x00FFFFFFFFFFFFFFULL);
-
-    void* orig_buf = sharedMem->buffer;
-    memcpy(clean_buf, orig_buf, sharedMem->size);
-
-    char msg[128];
-    snprintf(msg, sizeof(msg), "Substituted tagged %p with clean %p", orig_buf, clean_buf);
-    klog(msg);
-
-    sharedMem->buffer = clean_buf;
-    TEEC_Result res = TEEC_ERROR_BAD_PARAMETERS;
-    if (real_TEEC_RegisterSharedMemory) {
-        res = real_TEEC_RegisterSharedMemory(context, sharedMem);
-    }
-
-    if (res == TEEC_SUCCESS) {
-        for (int i = 0; i < MAX_TRACKED; i++) {
-            if (!g_tracked[i].clean_buf) {
-                g_tracked[i].orig_buf = orig_buf;
-                g_tracked[i].clean_buf = clean_buf;
-                g_tracked[i].size = sharedMem->size;
-                g_tracked[i].alloc_size = alloc_size;
-                g_tracked[i].flags = sharedMem->flags;
-                break;
-            }
-        }
-    } else {
-        sharedMem->buffer = orig_buf;
-        munmap(clean_buf, alloc_size);
-    }
-
-    return res;
-}
-
-void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
-    init_real();
-    if (!sharedMem || !sharedMem->buffer) return;
-
-    void* current_buf = sharedMem->buffer;
-    int idx = -1;
-
-    for (int i = 0; i < MAX_TRACKED; i++) {
-        if (g_tracked[i].clean_buf == current_buf) {
-            idx = i;
-            break;
-        }
-    }
-
-    if (real_TEEC_ReleaseSharedMemory) {
-        real_TEEC_ReleaseSharedMemory(sharedMem);
-    }
-
-    if (idx != -1) {
-        if (g_tracked[idx].flags & TEEC_MEM_OUTPUT) {
-            memcpy(g_tracked[idx].orig_buf, current_buf, g_tracked[idx].size);
-        }
-        sharedMem->buffer = g_tracked[idx].orig_buf;
-        munmap(current_buf, g_tracked[idx].alloc_size);
-        memset(&g_tracked[idx], 0, sizeof(g_tracked[idx]));
-    }
 }
