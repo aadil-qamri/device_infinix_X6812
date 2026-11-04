@@ -28,19 +28,19 @@ void* mmap(void* addr, size_t length, int prot, int flags, int fd, off_t offset)
 
     void* res = real_mmap(addr, length, prot, flags, fd, offset);
 
-    /* Log device mappings */
+    /* Trace calls related to device file descriptors */
     if (fd >= 0) {
         char msg[160];
-        snprintf(msg, sizeof(msg), "mmap(fd=%d, len=%zu, prot=0x%x, flags=0x%x, off=%ld) -> %p (errno=%d %s)",
-                 fd, length, prot, flags, (long)offset, res,
+        snprintf(msg, sizeof(msg), "mmap(fd=%d, len=%zu, prot=0x%x, flags=0x%x) -> %p (errno=%d %s)",
+                 fd, length, prot, flags, res,
                  res == MAP_FAILED ? errno : 0,
                  res == MAP_FAILED ? strerror(errno) : "OK");
         klog(msg);
 
-        /* Fallback: if driver rejects device mmap, allocate anonymous shared memory */
+        /* If /dev/isee_tee0 rejects direct device mmap, fallback to anonymous shared memory */
         if (res == MAP_FAILED && (flags & MAP_SHARED)) {
             void* anon = real_mmap(NULL, length, prot, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-            snprintf(msg, sizeof(msg), "Fallback anonymous mmap -> %p", anon);
+            snprintf(msg, sizeof(msg), "Fallback mmap(MAP_ANONYMOUS) -> %p", anon);
             klog(msg);
             if (anon != MAP_FAILED) {
                 return anon;
