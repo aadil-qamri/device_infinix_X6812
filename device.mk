@@ -62,7 +62,3 @@ PRODUCT_PACKAGES += \
 # OEM otacerts
 PRODUCT_EXTRA_RECOVERY_KEYS += \
     $(LOCAL_PATH)/security/infinix
-
-# Copy-files
-PRODUCT_COPY_FILES += \
-    $(LOCAL_PATH)/prebuilt/libteec_shim.so:$(TARGET_RECOVERY_ROOT_OUT)/vendor/lib64/libteec_shim.so
