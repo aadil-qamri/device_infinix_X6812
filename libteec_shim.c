@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <sys/ioctl.h>
 
 #define TEEC_SUCCESS               0x00000000
@@ -27,7 +28,7 @@ typedef uint32_t TEEC_Result;
 static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
 static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
-static int (*real_ioctl)(int, unsigned long, ...) = NULL;
+static int (*real_ioctl)(int, int, ...) = NULL;
 
 static void klog(const char* msg) {
     FILE* fp = fopen("/dev/kmsg", "w");
@@ -37,8 +38,8 @@ static void klog(const char* msg) {
     }
 }
 
-/* Intercept ioctl calls from libTEECommon to /dev/isee_tee0 */
-int ioctl(int fd, unsigned long request, ...) {
+/* Intercept ioctl calls from libTEECommon to /dev/isee_tee0 (Bionic int __op signature) */
+int ioctl(int fd, int request, ...) {
     if (!real_ioctl) {
         real_ioctl = dlsym(RTLD_NEXT, "ioctl");
     }
@@ -51,10 +52,11 @@ int ioctl(int fd, unsigned long request, ...) {
     int ret = real_ioctl(fd, request, argp);
 
     /* Log Beanpod TEE ioctl commands (Magic 0xA4) */
-    if ((request & 0xFF00) == 0xA400 || (request & 0xFF) == 0xA4) {
+    unsigned int u_req = (unsigned int)request;
+    if ((u_req & 0xFF00) == 0xA400 || (u_req & 0xFF) == 0xA4) {
         char msg[128];
-        snprintf(msg, sizeof(msg), "ioctl(0x%lx) ret=%d errno=%d (%s)",
-                 request, ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK");
+        snprintf(msg, sizeof(msg), "ioctl(0x%x) ret=%d errno=%d (%s)",
+                 u_req, ret, ret < 0 ? errno : 0, ret < 0 ? strerror(errno) : "OK");
         klog(msg);
     }
     return ret;
