@@ -11,21 +11,19 @@ on post-fs
     symlink /dev/block/mmcblk0boot0 /dev/block/platform/bootdevice/by-name/preloader_a
     symlink /dev/block/mmcblk0boot1 /dev/block/platform/bootdevice/by-name/preloader_b
 
-    # Fix OF installer
+    # Fix recovery/installer blockdevice path
     symlink /dev/block/platform/bootdevice /dev/block/bootdevice
 
-    # Support A/B feature for combo emmc OTA update
+    # Preloader A/B symlinks for OTA updates
+    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/by-name/preloader_emmc_a
+    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/by-name/preloader_emmc_b
     symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/platform/bootdevice/by-name/preloader_emmc_a
     symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/platform/bootdevice/by-name/preloader_emmc_b
 
-    # Support A/B feature for combo emmc OTA update
-    symlink /dev/block/platform/bootdevice/by-name/preloader_a /dev/block/by-name/preloader_emmc_a
-    symlink /dev/block/platform/bootdevice/by-name/preloader_b /dev/block/by-name/preloader_emmc_b
-
+    # Run partition helper once
     exec u:r:update_engine:s0 root root -- /system/bin/mtk_plpath_utils
-    start mtk.plpath.utils.link
 
-    # Create mountpoints
+    # Create mount points
     mkdir /mnt/vendor 0700 root root
     mkdir /mnt/vendor/protect_f 0700 root root
     mkdir /mnt/vendor/protect_s 0700 root root
@@ -33,12 +31,15 @@ on post-fs
     mkdir /mnt/vendor/nvcfg 0700 root root
     mkdir /mnt/vendor/persist 0700 root root
 
-    # Mount security partitions after symlinks are created
+    # Mount security and calibration partitions
     mount ext4 /dev/block/by-name/protect1 /mnt/vendor/protect_f noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/protect2 /mnt/vendor/protect_s noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/persist /mnt/vendor/persist noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/nvdata /mnt/vendor/nvdata noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/nvcfg /mnt/vendor/nvcfg noatime nosuid nodev wait
+
+    # Symlink /persist so tools expecting standard rootfs path find it
+    symlink /mnt/vendor/persist /persist
 
     # Keystore directory
     mkdir /tmp/misc 0777 root root
@@ -57,14 +58,6 @@ service keystore /system/bin/keystore /tmp/misc/keystore
     disabled
     seclabel u:r:recovery:s0
 
-service mtk.plpath.utils.link /system/bin/mtk_plpath_utils
-    class main
-    user root
-    group root system
-    disabled
-    oneshot
-    seclabel u:r:recovery:s0
-
 service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service.beanpod
     interface android.hardware.keymaster@4.0::IKeymasterDevice default
     user root
@@ -81,12 +74,13 @@ service gatekeeper-1-0 /system/bin/android.hardware.gatekeeper@1.0-service
     setenv LD_PRELOAD /vendor/lib64/libteec_shim.so
     seclabel u:r:recovery:s0
 
-# 1. Start All Three
+# Start crypto and security daemons when service manager is ready
 on property:hwservicemanager.ready=true
     start teei_daemon
     start keymaster-4-0
     start gatekeeper-1-0
 
+# Shut down crypto daemons once decryption completes to release RPMB and conserve power
 on property:ro.crypto.state=unsupported
     stop teei_daemon
     stop keymaster-4-0
