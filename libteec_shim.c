@@ -4,6 +4,7 @@
 #include <string.h>
 #include <dlfcn.h>
 #include <stdint.h>
+#include <unistd.h>
 
 #define TEEC_SUCCESS               0x00000000
 #define TEEC_ERROR_BAD_PARAMETERS   0xFFFF0006
@@ -27,28 +28,27 @@ typedef uint32_t TEEC_Result;
 
 static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
-static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 
 static void init_real(void) {
-    if (!real_TEEC_RegisterSharedMemory) {
+    if (!real_TEEC_AllocateSharedMemory) {
         void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
         if (!handle) handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
         if (handle) {
             real_TEEC_AllocateSharedMemory = dlsym(handle, "TEEC_AllocateSharedMemory");
             real_TEEC_ReleaseSharedMemory = dlsym(handle, "TEEC_ReleaseSharedMemory");
-            real_TEEC_RegisterSharedMemory = dlsym(handle, "TEEC_RegisterSharedMemory");
         }
     }
 }
 
-#define MAX_TRACKED 16
+#define MAX_TRACKED 8
 static struct {
     void* orig_buf;
-    void* aligned_buf;
-    size_t size;
-    uint32_t flags;
+    TEEC_SharedMemory allocated_shm;
 } g_tracked[MAX_TRACKED];
 
+/* 
+ * Intercept AllocateSharedMemory: delegate directly to real vendor 
+ */
 TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
     if (real_TEEC_AllocateSharedMemory) {
@@ -57,76 +57,83 @@ TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* 
     return TEEC_ERROR_BAD_PARAMETERS;
 }
 
+/* 
+ * Intercept RegisterSharedMemory:
+ * When microgatekeeper tries to register an unmappable heap buffer,
+ * allocate a true TEE driver-registered shared buffer via AllocateSharedMemory.
+ */
 TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
     if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
         return TEEC_ERROR_BAD_PARAMETERS;
     }
 
-    if (((uintptr_t)sharedMem->buffer & 4095) == 0) {
-        if (real_TEEC_RegisterSharedMemory) {
-            return real_TEEC_RegisterSharedMemory(context, sharedMem);
-        }
-    }
-
-    size_t aligned_size = (sharedMem->size + 4095) & ~4095;
-    void* aligned_ptr = NULL;
-    if (posix_memalign(&aligned_ptr, 4096, aligned_size) != 0 || !aligned_ptr) {
+    if (!real_TEEC_AllocateSharedMemory) {
         return TEEC_ERROR_OUT_OF_MEMORY;
     }
 
-    void* orig_ptr = sharedMem->buffer;
-    memcpy(aligned_ptr, orig_ptr, sharedMem->size);
+    void* orig_buffer = sharedMem->buffer;
+    size_t orig_size = sharedMem->size;
+    uint32_t orig_flags = sharedMem->flags;
 
-    sharedMem->buffer = aligned_ptr;
-    TEEC_Result res = TEEC_ERROR_BAD_PARAMETERS;
-    if (real_TEEC_RegisterSharedMemory) {
-        res = real_TEEC_RegisterSharedMemory(context, sharedMem);
+    /* Create driver-backed TEE shared memory */
+    TEEC_SharedMemory drv_shm;
+    memset(&drv_shm, 0, sizeof(drv_shm));
+    drv_shm.size = orig_size;
+    drv_shm.flags = orig_flags | TEEC_MEM_INPUT | TEEC_MEM_OUTPUT;
+
+    TEEC_Result res = real_TEEC_AllocateSharedMemory(context, &drv_shm);
+    if (res != TEEC_SUCCESS || !drv_shm.buffer) {
+        return TEEC_ERROR_OUT_OF_MEMORY;
     }
 
-    if (res == TEEC_SUCCESS) {
-        for (int i = 0; i < MAX_TRACKED; i++) {
-            if (!g_tracked[i].aligned_buf) {
-                g_tracked[i].orig_buf = orig_ptr;
-                g_tracked[i].aligned_buf = aligned_ptr;
-                g_tracked[i].size = sharedMem->size;
-                g_tracked[i].flags = sharedMem->flags;
-                break;
-            }
+    /* Copy input data (handle, pattern hash) to the TEE shared buffer */
+    memcpy(drv_shm.buffer, orig_buffer, orig_size);
+
+    /* Track the association so we can copy output back on release */
+    for (int i = 0; i < MAX_TRACKED; i++) {
+        if (!g_tracked[i].orig_buf) {
+            g_tracked[i].orig_buf = orig_buffer;
+            g_tracked[i].allocated_shm = drv_shm;
+            break;
         }
-    } else {
-        sharedMem->buffer = orig_ptr;
-        free(aligned_ptr);
     }
-    return res;
+
+    /* Pass the valid driver-backed shared memory to Gatekeeper */
+    *sharedMem = drv_shm;
+    return TEEC_SUCCESS;
 }
 
+/* 
+ * Intercept ReleaseSharedMemory:
+ * Copy verified auth token back to Gatekeeper's buffer, then free driver memory.
+ */
 void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
     init_real();
-    if (!sharedMem) return;
+    if (!sharedMem || !sharedMem->buffer) return;
 
-    void* current_buf = sharedMem->buffer;
-    void* orig_buf = NULL;
     int idx = -1;
-
     for (int i = 0; i < MAX_TRACKED; i++) {
-        if (g_tracked[i].aligned_buf == current_buf) {
-            orig_buf = g_tracked[i].orig_buf;
+        if (g_tracked[i].allocated_shm.buffer == sharedMem->buffer) {
             idx = i;
             break;
         }
     }
 
-    if (real_TEEC_ReleaseSharedMemory) {
-        real_TEEC_ReleaseSharedMemory(sharedMem);
-    }
-
-    if (idx != -1 && orig_buf) {
-        if (g_tracked[idx].flags & TEEC_MEM_OUTPUT) {
-            memcpy(orig_buf, current_buf, g_tracked[idx].size);
+    if (idx != -1 && g_tracked[idx].orig_buf) {
+        /* Copy output results (auth token) back to Gatekeeper */
+        memcpy(g_tracked[idx].orig_buf, sharedMem->buffer, g_tracked[idx].allocated_shm.size);
+        
+        /* Free through real vendor TEE allocator */
+        if (real_TEEC_ReleaseSharedMemory) {
+            real_TEEC_ReleaseSharedMemory(&g_tracked[idx].allocated_shm);
         }
-        free(current_buf);
-        sharedMem->buffer = orig_buf;
+        
+        sharedMem->buffer = g_tracked[idx].orig_buf;
         memset(&g_tracked[idx], 0, sizeof(g_tracked[idx]));
+    } else {
+        if (real_TEEC_ReleaseSharedMemory) {
+            real_TEEC_ReleaseSharedMemory(sharedMem);
+        }
     }
 }
