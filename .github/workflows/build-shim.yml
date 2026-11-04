@@ -5,7 +5,114 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Generate libteec_shim.c
+        run: |
+          cat << 'EOF' > libteec_shim.c
+          #define _GNU_SOURCE
+          #include <stdio.h>
+          #include <stdlib.h>
+          #include <string.h>
+          #include <dlfcn.h>
+          #include <stdint.h>
+
+          #define TEEC_SUCCESS               0x00000000
+          #define TEEC_ERROR_BAD_PARAMETERS   0xFFFF0006
+          #define TEEC_ERROR_OUT_OF_MEMORY   0xFFFF000C
+          #define TEEC_MEM_INPUT             0x00000001
+          #define TEEC_MEM_OUTPUT            0x00000002
+
+          typedef struct {
+              void* buffer;
+              size_t size;
+              uint32_t flags;
+              uint32_t ops;
+              uint64_t dummy;
+          } TEEC_SharedMemory;
+
+          typedef struct {
+              int fd;
+          } TEEC_Context;
+
+          typedef uint32_t TEEC_Result;
+
+          static TEEC_Result (*real_TEEC_AllocateSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
+          static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
+          static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
+
+          static void init_real_functions(void) {
+              if (!real_TEEC_AllocateSharedMemory) {
+                  void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
+                  if (!handle) {
+                      handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
+                  }
+                  if (handle) {
+                      real_TEEC_AllocateSharedMemory = dlsym(handle, "TEEC_AllocateSharedMemory");
+                      real_TEEC_ReleaseSharedMemory = dlsym(handle, "TEEC_ReleaseSharedMemory");
+                      real_TEEC_RegisterSharedMemory = dlsym(handle, "TEEC_RegisterSharedMemory");
+                  }
+              }
+          }
+
+          TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
+              init_real_functions();
+              if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
+
+              if (real_TEEC_AllocateSharedMemory) {
+                  TEEC_Result res = real_TEEC_AllocateSharedMemory(context, sharedMem);
+                  if (res == TEEC_SUCCESS) return res;
+              }
+
+              size_t aligned_size = (sharedMem->size + 4095) & ~4095;
+              if (aligned_size == 0) aligned_size = 4096;
+
+              void* ptr = NULL;
+              if (posix_memalign(&ptr, 4096, aligned_size) != 0 || !ptr) {
+                  return TEEC_ERROR_OUT_OF_MEMORY;
+              }
+              memset(ptr, 0, aligned_size);
+              sharedMem->buffer = ptr;
+              return TEEC_SUCCESS;
+          }
+
+          TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
+              init_real_functions();
+              if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
+                  return TEEC_ERROR_BAD_PARAMETERS;
+              }
+
+              if (real_TEEC_RegisterSharedMemory) {
+                  TEEC_Result res = real_TEEC_RegisterSharedMemory(context, sharedMem);
+                  if (res == TEEC_SUCCESS) return res;
+              }
+
+              void* orig_buffer = sharedMem->buffer;
+              size_t size = sharedMem->size;
+
+              TEEC_Result res = TEEC_AllocateSharedMemory(context, sharedMem);
+              if (res != TEEC_SUCCESS) return res;
+
+              if (sharedMem->flags & TEEC_MEM_INPUT) {
+                  memcpy(sharedMem->buffer, orig_buffer, size);
+              }
+
+              return TEEC_SUCCESS;
+          }
+
+          void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
+              init_real_functions();
+              if (!sharedMem) return;
+
+              if (real_TEEC_ReleaseSharedMemory) {
+                  real_TEEC_ReleaseSharedMemory(sharedMem);
+                  return;
+              }
+
+              if (sharedMem->buffer) {
+                  free(sharedMem->buffer);
+                  sharedMem->buffer = NULL;
+              }
+          }
+          EOF
 
       - name: Compile with Android NDK Clang
         run: |
@@ -13,6 +120,10 @@ jobs:
             -shared -fPIC -O2 -Wall \
             -o libteec_shim.so \
             libteec_shim.c -ldl
+
+      - name: Verify Dynamic Linking
+        run: |
+          readelf -d libteec_shim.so | grep NEEDED
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
