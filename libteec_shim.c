@@ -8,15 +8,20 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 
 #define TEEC_SUCCESS               0x00000000
 #define TEEC_ERROR_BAD_PARAMETERS   0xFFFF0006
 #define TEEC_ERROR_OUT_OF_MEMORY   0xFFFF000C
+#define TEEC_MEM_INPUT             0x00000001
+#define TEEC_MEM_OUTPUT            0x00000002
 
 typedef struct {
     void* buffer;
     size_t size;
     uint32_t flags;
+    uint32_t ops;
+    uint64_t dummy;
 } TEEC_SharedMemory;
 
 typedef struct {
@@ -38,7 +43,6 @@ static void klog(const char* msg) {
     }
 }
 
-/* Intercept ioctl calls from libTEECommon to /dev/isee_tee0 (Bionic int __op signature) */
 int ioctl(int fd, int request, ...) {
     if (!real_ioctl) {
         real_ioctl = dlsym(RTLD_NEXT, "ioctl");
@@ -51,7 +55,6 @@ int ioctl(int fd, int request, ...) {
 
     int ret = real_ioctl(fd, request, argp);
 
-    /* Log Beanpod TEE ioctl commands (Magic 0xA4) */
     unsigned int u_req = (unsigned int)request;
     if ((u_req & 0xFF00) == 0xA400 || (u_req & 0xFF) == 0xA4) {
         char msg[128];
@@ -63,7 +66,7 @@ int ioctl(int fd, int request, ...) {
 }
 
 static void init_real(void) {
-    if (!real_TEEC_AllocateSharedMemory) {
+    if (!real_TEEC_RegisterSharedMemory) {
         void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
         if (!handle) handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
         if (handle) {
@@ -77,45 +80,106 @@ static void init_real(void) {
     }
 }
 
+#define MAX_TRACKED 8
+static struct {
+    void* orig_buf;
+    void* clean_buf;
+    size_t size;
+    size_t alloc_size;
+    uint32_t flags;
+} g_tracked[MAX_TRACKED];
+
 TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
-    if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
-
-    char msg[128];
-    snprintf(msg, sizeof(msg), "TEEC_AllocateSharedMemory req: size=%zu, flags=0x%x",
-             sharedMem->size, sharedMem->flags);
-    klog(msg);
-
     if (real_TEEC_AllocateSharedMemory) {
-        TEEC_Result res = real_TEEC_AllocateSharedMemory(context, sharedMem);
-        snprintf(msg, sizeof(msg), "real_TEEC_AllocateSharedMemory res=0x%x buf=%p", res, sharedMem->buffer);
-        klog(msg);
-        return res;
+        return real_TEEC_AllocateSharedMemory(context, sharedMem);
     }
     return TEEC_ERROR_BAD_PARAMETERS;
 }
 
 TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
     init_real();
-    if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
+    if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
+        return TEEC_ERROR_BAD_PARAMETERS;
+    }
+
+    uintptr_t raw_addr = (uintptr_t)sharedMem->buffer;
+    int is_tagged = ((raw_addr >> 56) != 0);
+    int is_unaligned = ((raw_addr & 4095) != 0);
+
+    /* If pointer is untagged and page-aligned, let real driver handle it directly */
+    if (!is_tagged && !is_unaligned) {
+        if (real_TEEC_RegisterSharedMemory) {
+            return real_TEEC_RegisterSharedMemory(context, sharedMem);
+        }
+    }
+
+    size_t alloc_size = (sharedMem->size + 4095) & ~4095;
+    void* clean_buf = mmap(NULL, alloc_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_SHARED, -1, 0);
+    if (clean_buf == MAP_FAILED) {
+        klog("mmap failed");
+        return TEEC_ERROR_OUT_OF_MEMORY;
+    }
+
+    /* Guarantee no upper tag bits exist */
+    clean_buf = (void*)((uintptr_t)clean_buf & 0x00FFFFFFFFFFFFFFULL);
+
+    void* orig_buf = sharedMem->buffer;
+    memcpy(clean_buf, orig_buf, sharedMem->size);
 
     char msg[128];
-    snprintf(msg, sizeof(msg), "TEEC_RegisterSharedMemory req: buf=%p, size=%zu, flags=0x%x",
-             sharedMem->buffer, sharedMem->size, sharedMem->flags);
+    snprintf(msg, sizeof(msg), "Substituted tagged %p with clean %p", orig_buf, clean_buf);
     klog(msg);
 
+    sharedMem->buffer = clean_buf;
+    TEEC_Result res = TEEC_ERROR_BAD_PARAMETERS;
     if (real_TEEC_RegisterSharedMemory) {
-        TEEC_Result res = real_TEEC_RegisterSharedMemory(context, sharedMem);
-        snprintf(msg, sizeof(msg), "real_TEEC_RegisterSharedMemory res=0x%x", res);
-        klog(msg);
-        return res;
+        res = real_TEEC_RegisterSharedMemory(context, sharedMem);
     }
-    return TEEC_ERROR_BAD_PARAMETERS;
+
+    if (res == TEEC_SUCCESS) {
+        for (int i = 0; i < MAX_TRACKED; i++) {
+            if (!g_tracked[i].clean_buf) {
+                g_tracked[i].orig_buf = orig_buf;
+                g_tracked[i].clean_buf = clean_buf;
+                g_tracked[i].size = sharedMem->size;
+                g_tracked[i].alloc_size = alloc_size;
+                g_tracked[i].flags = sharedMem->flags;
+                break;
+            }
+        }
+    } else {
+        sharedMem->buffer = orig_buf;
+        munmap(clean_buf, alloc_size);
+    }
+
+    return res;
 }
 
 void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
     init_real();
-    if (sharedMem && real_TEEC_ReleaseSharedMemory) {
+    if (!sharedMem || !sharedMem->buffer) return;
+
+    void* current_buf = sharedMem->buffer;
+    int idx = -1;
+
+    for (int i = 0; i < MAX_TRACKED; i++) {
+        if (g_tracked[i].clean_buf == current_buf) {
+            idx = i;
+            break;
+        }
+    }
+
+    if (real_TEEC_ReleaseSharedMemory) {
         real_TEEC_ReleaseSharedMemory(sharedMem);
+    }
+
+    if (idx != -1) {
+        if (g_tracked[idx].flags & TEEC_MEM_OUTPUT) {
+            memcpy(g_tracked[idx].orig_buf, current_buf, g_tracked[idx].size);
+        }
+        sharedMem->buffer = g_tracked[idx].orig_buf;
+        munmap(current_buf, g_tracked[idx].alloc_size);
+        memset(&g_tracked[idx], 0, sizeof(g_tracked[idx]));
     }
 }
