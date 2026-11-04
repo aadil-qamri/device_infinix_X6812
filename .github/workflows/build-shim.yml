@@ -39,12 +39,10 @@ jobs:
           static void (*real_TEEC_ReleaseSharedMemory)(TEEC_SharedMemory*) = NULL;
           static TEEC_Result (*real_TEEC_RegisterSharedMemory)(TEEC_Context*, TEEC_SharedMemory*) = NULL;
 
-          static void init_real_functions(void) {
-              if (!real_TEEC_AllocateSharedMemory) {
+          static void init_real(void) {
+              if (!real_TEEC_RegisterSharedMemory) {
                   void* handle = dlopen("/vendor/lib64/libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
-                  if (!handle) {
-                      handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
-                  }
+                  if (!handle) handle = dlopen("libTEECommon.so", RTLD_NOW | RTLD_GLOBAL);
                   if (handle) {
                       real_TEEC_AllocateSharedMemory = dlsym(handle, "TEEC_AllocateSharedMemory");
                       real_TEEC_ReleaseSharedMemory = dlsym(handle, "TEEC_ReleaseSharedMemory");
@@ -53,80 +51,88 @@ jobs:
               }
           }
 
+          #define MAX_TRACKED 16
+          static struct {
+              void* orig_buf;
+              void* aligned_buf;
+              size_t size;
+              uint32_t flags;
+          } g_tracked[MAX_TRACKED];
+
           TEEC_Result TEEC_AllocateSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
-              init_real_functions();
-              if (!sharedMem) return TEEC_ERROR_BAD_PARAMETERS;
-
+              init_real();
               if (real_TEEC_AllocateSharedMemory) {
-                  TEEC_Result res = real_TEEC_AllocateSharedMemory(context, sharedMem);
-                  if (res == TEEC_SUCCESS) return res;
+                  return real_TEEC_AllocateSharedMemory(context, sharedMem);
               }
-
-              size_t aligned_size = (sharedMem->size + 4095) & ~4095;
-              if (aligned_size == 0) aligned_size = 4096;
-
-              void* ptr = NULL;
-              if (posix_memalign(&ptr, 4096, aligned_size) != 0 || !ptr) {
-                  return TEEC_ERROR_OUT_OF_MEMORY;
-              }
-              memset(ptr, 0, aligned_size);
-              sharedMem->buffer = ptr;
-              return TEEC_SUCCESS;
+              return TEEC_ERROR_BAD_PARAMETERS;
           }
 
           TEEC_Result TEEC_RegisterSharedMemory(TEEC_Context* context, TEEC_SharedMemory* sharedMem) {
-              init_real_functions();
+              init_real();
               if (!sharedMem || !sharedMem->buffer || sharedMem->size == 0) {
                   return TEEC_ERROR_BAD_PARAMETERS;
               }
 
+              /* If buffer is already 4K page-aligned, let real driver handle it directly */
+              if (((uintptr_t)sharedMem->buffer & 4095) == 0) {
+                  if (real_TEEC_RegisterSharedMemory) {
+                      return real_TEEC_RegisterSharedMemory(context, sharedMem);
+                  }
+              }
+
+              /* Unaligned heap buffer from malloc: allocate 4K page-aligned memory */
+              size_t aligned_size = (sharedMem->size + 4095) & ~4095;
+              void* aligned_ptr = NULL;
+              if (posix_memalign(&aligned_ptr, 4096, aligned_size) != 0 || !aligned_ptr) {
+                  return TEEC_ERROR_OUT_OF_MEMORY;
+              }
+
+              void* orig_ptr = sharedMem->buffer;
+              memcpy(aligned_ptr, orig_ptr, sharedMem->size);
+
+              /* Assign aligned buffer so kernel driver can pin physical pages */
+              sharedMem->buffer = aligned_ptr;
+              TEEC_Result res = TEEC_ERROR_BAD_PARAMETERS;
               if (real_TEEC_RegisterSharedMemory) {
-                  TEEC_Result res = real_TEEC_RegisterSharedMemory(context, sharedMem);
-                  if (res == TEEC_SUCCESS) return res;
+                  res = real_TEEC_RegisterSharedMemory(context, sharedMem);
               }
 
-              void* orig_buffer = sharedMem->buffer;
-              size_t size = sharedMem->size;
-
-              TEEC_Result res = TEEC_AllocateSharedMemory(context, sharedMem);
-              if (res != TEEC_SUCCESS) return res;
-
-              if (sharedMem->flags & TEEC_MEM_INPUT) {
-                  memcpy(sharedMem->buffer, orig_buffer, size);
+              if (res == TEEC_SUCCESS) {
+                  for (int i = 0; i < MAX_TRACKED; i++) {
+                      if (!g_tracked[i].aligned_buf) {
+                          g_tracked[i].orig_buf = orig_ptr;
+                          g_tracked[i].aligned_buf = aligned_ptr;
+                          g_tracked[i].size = sharedMem->size;
+                          g_tracked[i].flags = sharedMem->flags;
+                          break;
+                      }
+                  }
+              } else {
+                  sharedMem->buffer = orig_ptr;
+                  free(aligned_ptr);
               }
-
-              return TEEC_SUCCESS;
+              return res;
           }
 
           void TEEC_ReleaseSharedMemory(TEEC_SharedMemory* sharedMem) {
-              init_real_functions();
+              init_real();
               if (!sharedMem) return;
+
+              void* current_buf = sharedMem->buffer;
+              void* orig_buf = NULL;
+              int idx = -1;
+
+              for (int i = 0; i < MAX_TRACKED; i++) {
+                  if (g_tracked[i].aligned_buf == current_buf) {
+                      orig_buf = g_tracked[i].orig_buf;
+                      idx = i;
+                      break;
+                  }
+              }
 
               if (real_TEEC_ReleaseSharedMemory) {
                   real_TEEC_ReleaseSharedMemory(sharedMem);
-                  return;
               }
 
-              if (sharedMem->buffer) {
-                  free(sharedMem->buffer);
-                  sharedMem->buffer = NULL;
-              }
-          }
-          EOF
-
-      - name: Compile with Android NDK Clang
-        run: |
-          $ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang \
-            -shared -fPIC -O2 -Wall \
-            -o libteec_shim.so \
-            libteec_shim.c -ldl
-
-      - name: Verify Dynamic Linking
-        run: |
-          readelf -d libteec_shim.so | grep NEEDED
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: libteec_shim
-          path: libteec_shim.so
+              if (idx != -1 && orig_buf) {
+                  if (g_tracked[idx].flags & TEEC_MEM_OUTPUT
