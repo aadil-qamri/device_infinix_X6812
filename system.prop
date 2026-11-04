@@ -4,3 +4,5 @@ ro.mtk_microtrust_tee_support=1
 ro.crypto.volume.filenames_mode=aes-256-cts
 ro.hardware.kmsetkey=beanpod
 ro.hardware.gatekeeper=beanpod
+ro.build.version.security_patch=2099-12-05
+ro.vendor.build.security_patch=2099-12-05
