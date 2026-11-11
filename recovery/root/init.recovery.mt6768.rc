@@ -63,7 +63,6 @@ service keymaster-4-0 /system/bin/android.hardware.keymaster@4.0-service.beanpod
     user root
     group root drmrpc system
     disabled
-    setenv LD_PRELOAD /vendor/lib64/libteec_shim.so
     seclabel u:r:recovery:s0
 
 service gatekeeper-1-0 /system/bin/android.hardware.gatekeeper@1.0-service
