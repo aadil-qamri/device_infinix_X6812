@@ -1,0 +1,27 @@
+name: Build TEEC Shim
+on: [workflow_dispatch, push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compile with Android NDK Clang
+        run: |
+          $ANDROID_NDK_LATEST_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang \
+            -shared -fPIC -O2 -Wall \
+            -o libteec_shim.so \
+            libteec_shim.c -ldl
+
+      - name: Verify Linker Dependencies
+        run: |
+          readelf -d libteec_shim.so | grep NEEDED
+          nm -D libteec_shim.so
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libteec_shim
+          path: libteec_shim.so
