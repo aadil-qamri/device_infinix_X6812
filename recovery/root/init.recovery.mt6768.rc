@@ -36,7 +36,7 @@ on post-fs
     # Mount security partitions after symlinks are created
     mount ext4 /dev/block/by-name/protect1 /mnt/vendor/protect_f noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/protect2 /mnt/vendor/protect_s noatime nosuid nodev wait
-    mount ext4 /dev/block/by-name/persist /mnt/vendor/persist noatime nosuid nodev wait
+    # Removed /persist for better error handleing
     mount ext4 /dev/block/by-name/nvdata /mnt/vendor/nvdata noatime nosuid nodev wait
     mount ext4 /dev/block/by-name/nvcfg /mnt/vendor/nvcfg noatime nosuid nodev wait
 
