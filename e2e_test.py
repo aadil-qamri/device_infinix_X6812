@@ -107,16 +107,6 @@ class DeviceTester:
             log_fail("Sensors service failed to enumerate physical sensors")
             self.failures += 1
 
-    def test_nfc(self):
-        log_info("Testing NFC AIDL HAL...")
-        out, _, _ = self.shell("dumpsys nfc | grep -E 'mState|mIsHceCapable'")
-        if "mState=on" in out:
-            log_pass("NFC daemon active and state is ON")
-            self.passes += 1
-        else:
-            log_fail(f"NFC state not ON (got: {out})")
-            self.failures += 1
-
     def test_camera_and_torch(self):
         log_info("Testing Camera HAL and Flashlight...")
         out, _, _ = self.shell("dumpsys media.camera | head -n 10")
@@ -208,8 +198,6 @@ class DeviceTester:
         self.test_battery_and_health()
         print()
         self.test_sensors()
-        print()
-        self.test_nfc()
         print()
         self.test_camera_and_torch()
         print()

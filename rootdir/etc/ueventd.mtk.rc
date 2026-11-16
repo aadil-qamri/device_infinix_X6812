@@ -50,10 +50,6 @@
 /dev/fm                   0666   media     media
 #TCD:add XLJLHLJYR-21 for dev/fm by shouhui.li 20200810 end
 
-# NFC
-/dev/st21nfc              0660   nfc        radio
-/dev/st54spi              0660   secure_element        secure_element
-
 # MTK BTIF driver
 /dev/btif                 0600   system     system
 

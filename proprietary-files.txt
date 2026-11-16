@@ -743,7 +743,6 @@ vendor/firmware/soc3_0_ram_bt_1a_1_hdr.bin
 vendor/firmware/soc3_0_ram_mcu_1_1_hdr.bin
 vendor/firmware/soc3_0_ram_mcu_1a_1_hdr.bin
 vendor/firmware/soc3_0_ram_mcu_e1_hdr.bin
-vendor/firmware/st21nfc_fw7.bin
 vendor/firmware/wifi.cfg
 
 # Graphics (Hardware)
@@ -1022,11 +1021,6 @@ vendor/lib64/libnvram_platform.so
 vendor/lib64/libnvram_sec.so
 vendor/lib64/vendor.mediatek.hardware.nvram@1.0.so
 vendor/lib64/vendor.mediatek.hardware.nvram@1.1.so
-
-# NFC
-vendor/etc/libnfc-hal-st.conf
-vendor/etc/libnfc-nci.conf
-vendor/etc/st21nfc_conf.txt
 
 # Power
 vendor/lib/vendor.mediatek.hardware.power@2.0.so

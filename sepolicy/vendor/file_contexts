@@ -21,8 +21,6 @@
 /dev/biometric u:object_r:biometric_device:s0
 /dev/m_bio_misc u:object_r:m_bio_misc_device:s0
 
-# NFC labels (device node, socket and -st service) come from
-# device/mediatek/sepolicy_vndr/base/vendor/file_contexts.
 # Power
 /vendor/bin/hw/android\.hardware\.power-service\.lineage-libperfmgr                    u:object_r:hal_power_default_exec:s0
 

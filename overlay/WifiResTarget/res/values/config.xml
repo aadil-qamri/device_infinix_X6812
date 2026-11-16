@@ -10,7 +10,7 @@
     <string name="config_wifi_tcp_buffers" translatable="false">1730560,3461120,6922240,524288,1048576,4525824</string>
 
     <!-- Default access point SSID used for tethering -->
-    <string name="wifi_tether_configure_ssid_default" translatable="false">Infinix HOT 11S NFC</string>
+    <string name="wifi_tether_configure_ssid_default" translatable="false">Infinix HOT 11S</string>
 
     <!-- Boolean indicating whether the wifi chipset supports background scanning mechanism. -->
     <bool name="config_wifi_background_scan_support">true</bool>
