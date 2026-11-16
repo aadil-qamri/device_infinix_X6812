@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-DEVICE_PATH := device/infinix/X6812B
+DEVICE_PATH := device/infinix/X6812
 KERNEL_PATH := $(DEVICE_PATH)-kernel
 
 # Architecture
@@ -21,7 +21,7 @@ TARGET_2ND_CPU_ABI2 := armeabi
 TARGET_2ND_CPU_VARIANT := cortex-a55
 
 # Assert
-TARGET_OTA_ASSERT_DEVICE := X6812B,x6812b
+TARGET_OTA_ASSERT_DEVICE := X6812,x6812
 
 # AVB (Android Verified Boot)
 BOARD_AVB_ENABLE := true
@@ -48,7 +48,7 @@ BOARD_AVB_BOOT_ROLLBACK_INDEX_LOCATION := 3
 
 # Board
 TARGET_BOARD_PLATFORM := mt6768
-TARGET_BOOTLOADER_BOARD_NAME := X6812B
+TARGET_BOOTLOADER_BOARD_NAME := X6812
 TARGET_NO_BOOTLOADER := true
 
 # Build
@@ -161,4 +161,4 @@ WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := true
 WIFI_HIDL_FEATURE_DUAL_INTERFACE := true
 
 # Inherit from the proprietary version
-include vendor/infinix/X6812B/BoardConfigVendor.mk
+include vendor/infinix/X6812/BoardConfigVendor.mk

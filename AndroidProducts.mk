@@ -5,4 +5,4 @@
 #
 
 PRODUCT_MAKEFILES := \
-    $(LOCAL_DIR)/lineage_X6812B.mk
+    $(LOCAL_DIR)/lineage_X6812.mk

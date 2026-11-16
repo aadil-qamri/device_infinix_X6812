@@ -31,13 +31,13 @@ Two soong stages fail with very different messages — identify which you have:
 | `writing legacy Make module rules` / `overriding commands for target` | Make install | two modules install to the same destination |
 
 For duplicate installs, grep the target in
-`out/soong/installs-lineage_X6812B.mk` — it lists every rule, so you can see
+`out/soong/installs-lineage_X6812.mk` — it lists every rule, so you can see
 both sources.
 
 ### Known traps
 
 - **A stale output file does not mean the current config builds.** A
-  `build.lineage_X6812B.ninja` from an earlier successful run will still be on
+  `build.lineage_X6812.ninja` from an earlier successful run will still be on
   disk after a later failure. Check timestamps.
 - **`stem:` renames only the installed file, not the module.** Two modules can
   therefore write one destination. Prebuilt blobs whose `DT_NEEDED` is baked in
@@ -163,7 +163,7 @@ Before removing a `.rc` line, sepolicy path, or blob:
 ## Commits
 
 - Commit message structure:
-  1. Subject line: `<codename>: <summary>` (e.g. `X6812B: wifi: enable WPA3-SAE softap support`).
+  1. Subject line: `<codename>: <summary>` (e.g. `X6812: wifi: enable WPA3-SAE softap support`).
   2. Log snippet: verbatim error, logcat trace, or failing command output showing the bug/repro.
   3. Explanation: root cause, what was verified on hardware vs assumed, and why the chosen fix is correct.
 - No explanatory comments in code/config files; put all reasoning in the commit message.

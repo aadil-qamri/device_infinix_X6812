@@ -10,7 +10,7 @@ import os
 import sys
 from hashlib import sha1
 
-device='X6812B'
+device='X6812'
 vendor='infinix'
 
 with open('proprietary-files.txt', 'r') as f:

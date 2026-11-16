@@ -46,7 +46,7 @@ Gotchas:
 - `checkpolicy` prints `ERROR 'unknown type X'` but **still exits 0**. The script
   therefore treats an empty output file as failure and never trusts the exit code.
   If you run `checkpolicy` by hand, check `-s`/`-f` on the `.cil` yourself.
-- The rule block moves between `build.lineage_X6812B.N.ninja` splits across
+- The rule block moves between `build.lineage_X6812.N.ninja` splits across
   builds. The script globs all of them rather than hardcoding `.9.ninja`.
 - A missing rule means `out/` is stale (no successful configure since the module
   was last touched). The script says so instead of silently passing.
@@ -64,22 +64,22 @@ BOARD_SEPOLICY_VERS="202404" PRODUCT_ENFORCE_VINTF_MANIFEST=true \
   -o ../../../out/soong/.intermediates/system/libhidl/vintfdata/vendor_manifest.xml/android_arm64_armv8-2a-dotprod_cortex-a75/manifest.xml
 
 cp -f -d ../../../out/soong/.intermediates/system/libhidl/vintfdata/vendor_manifest.xml/android_arm64_armv8-2a-dotprod_cortex-a75/manifest.xml \
-  ../../../out/target/product/X6812B/vendor/etc/vintf/manifest.xml
+  ../../../out/target/product/X6812/vendor/etc/vintf/manifest.xml
 
 # 2. Check vendor manifest against fragments in /vendor/etc/vintf/manifest/
 ../../../out/host/linux-x86/bin/checkvintf --check-one \
-  --dirmap /vendor:../../../out/target/product/X6812B/vendor \
-  --dirmap /apex:../../../out/target/product/X6812B/obj/PACKAGING/check_vintf_all_intermediates/apex \
+  --dirmap /vendor:../../../out/target/product/X6812/vendor \
+  --dirmap /apex:../../../out/target/product/X6812/obj/PACKAGING/check_vintf_all_intermediates/apex \
   --property ro.boot.product.vendor.sku=
 
 # 3. Check full framework/device compatibility matrix
 ../../../out/host/linux-x86/bin/checkvintf --check-compat \
-  --dirmap /system:../../../out/target/product/X6812B/system \
-  --dirmap /vendor:../../../out/target/product/X6812B/vendor \
-  --dirmap /odm:../../../out/target/product/X6812B/vendor/odm \
-  --dirmap /product:../../../out/target/product/X6812B/product \
-  --dirmap /system_ext:../../../out/target/product/X6812B/system_ext \
-  --dirmap /apex:../../../out/target/product/X6812B/obj/PACKAGING/check_vintf_all_intermediates/apex \
+  --dirmap /system:../../../out/target/product/X6812/system \
+  --dirmap /vendor:../../../out/target/product/X6812/vendor \
+  --dirmap /odm:../../../out/target/product/X6812/vendor/odm \
+  --dirmap /product:../../../out/target/product/X6812/product \
+  --dirmap /system_ext:../../../out/target/product/X6812/system_ext \
+  --dirmap /apex:../../../out/target/product/X6812/obj/PACKAGING/check_vintf_all_intermediates/apex \
   --property ro.product.first_api_level=30 \
   --property ro.boot.product.hardware.sku= \
   --property ro.boot.product.vendor.sku=
@@ -94,7 +94,7 @@ Validate context files against `precompiled_sepolicy` to catch invalid regex,
 undeclared types, or missing labels without building:
 
 ```bash
-POLICY="../../../out/target/product/X6812B/vendor/etc/selinux/precompiled_sepolicy"
+POLICY="../../../out/target/product/X6812/vendor/etc/selinux/precompiled_sepolicy"
 
 # File contexts
 ../../../out/host/linux-x86/bin/checkfc "$POLICY" sepolicy/vendor/file_contexts
@@ -163,20 +163,20 @@ bash /tmp/opencode/elfcheck.sh     # exit 0 = pass, 2 = fail
 ```
 
 It uses the already-built dependency `.so` files under
-`out/target/product/X6812B/obj/SHARED_LIBRARIES/`, so it is valid as long as
+`out/target/product/X6812/obj/SHARED_LIBRARIES/`, so it is valid as long as
 those exist from a previous build.
 
 Useful standalone check across the whole vendor tree — does any `DT_NEEDED` name
-lack an installed file? Compare against `out/soong/installs-lineage_X6812B.mk`,
+lack an installed file? Compare against `out/soong/installs-lineage_X6812.mk`,
 which is the authoritative list of what gets installed:
 
 ```bash
 python3 - <<'PY'
 import re, subprocess, glob, os
-inst=open('out/soong/installs-lineage_X6812B.mk', errors='replace').read()
+inst=open('out/soong/installs-lineage_X6812.mk', errors='replace').read()
 known={os.path.basename(m) for m in
-       re.findall(r'out/target/product/X6812B/[^\s:]*lib64/([A-Za-z0-9@._+-]+\.so):', inst)}
-vdir='vendor/infinix/X6812B/proprietary/vendor/lib64'
+       re.findall(r'out/target/product/X6812/[^\s:]*lib64/([A-Za-z0-9@._+-]+\.so):', inst)}
+vdir='vendor/infinix/X6812/proprietary/vendor/lib64'
 known |= {os.path.basename(f) for f in glob.glob(vdir+'/*.so')}
 need={}
 for f in glob.glob(vdir+'/*.so'):
@@ -193,14 +193,14 @@ come from `/system` or the vendor tree, so a same-directory scan produces a long
 list of false positives.
 ### Standalone vendor tree SONAME audit
 
-Validate all `.so` binaries in `vendor/infinix/X6812B/` for `DT_SONAME != filename`
+Validate all `.so` binaries in `vendor/infinix/X6812/` for `DT_SONAME != filename`
 mismatches without a build (which trigger Soong `check_elf_files` failures):
 
 ```bash
 python3 - <<'PY'
 import os, glob, subprocess
 
-vendor_dir = "vendor/infinix/X6812B/proprietary/vendor"
+vendor_dir = "vendor/infinix/X6812/proprietary/vendor"
 for f in glob.glob(f"{vendor_dir}/**/*.so", recursive=True):
     fname = os.path.basename(f)
     out = subprocess.run(["readelf", "-d", f], capture_output=True, text=True).stdout
@@ -240,7 +240,7 @@ PY
 #### 2. C++ Shims (`clang++`)
 ```bash
 prebuilts/clang/host/linux-x86/clang-r536225/bin/clang++ -c \
-    device/infinix/X6812B/libshims/libshim_unwindstack.cpp -o /tmp/shim.o \
+    device/infinix/X6812/libshims/libshim_unwindstack.cpp -o /tmp/shim.o \
     -target aarch64-linux-android10000 \
     -Isystem/unwindstack/include -Isystem/core/include -Isystem/libbase/include \
     -std=c++20 -fPIC -Wall -Werror && rm -f /tmp/shim.o
@@ -267,7 +267,7 @@ android_root = os.path.abspath('../../..')
 aapt2 = os.path.join(android_root, 'out/host/linux-x86/bin/aapt2')
 zipalign = os.path.join(android_root, 'out/host/linux-x86/bin/zipalign')
 apksigner = os.path.join(android_root, 'out/host/linux-x86/bin/apksigner')
-framework_res = os.path.join(android_root, 'out/target/product/X6812B/system/framework/framework-res.apk')
+framework_res = os.path.join(android_root, 'out/target/product/X6812/system/framework/framework-res.apk')
 
 # 1. Target overlay directory (e.g. overlay/SettingsResTarget or overlay/FrameworksResTarget)
 overlay_dir = os.path.abspath('overlay/FrameworksResTarget')
@@ -321,7 +321,7 @@ you can compile ONLY that binary target using the prebuilt ninja without invokin
 
 ```bash
 # 1. Compile the single binary target
-../../../prebuilts/build-tools/linux-x86/bin/ninja -f ../../../out/combined-lineage_X6812B.ninja \
+../../../prebuilts/build-tools/linux-x86/bin/ninja -f ../../../out/combined-lineage_X6812.ninja \
   out/soong/.intermediates/hardware/mediatek/aidl/health/android.hardware.health-service.mediatek/android_vendor_arm64_armv8-2a-dotprod_cortex-a75/android.hardware.health-service.mediatek
 
 # 2. Push to live device and set permissions/SELinux context

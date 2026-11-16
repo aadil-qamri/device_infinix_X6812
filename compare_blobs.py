@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare proprietary-files.txt and extract-files.py against x6812b.txt (source of truth).
+"""Compare proprietary-files.txt and extract-files.py against x6812.txt (source of truth).
 
 Comments out missing blobs/entries, or removes them when --remove is passed.
 """
@@ -235,8 +235,8 @@ def process_extract_files_py(py_path: str, exact_set: set, basename_map: dict, r
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Audit and filter blobs against x6812b.txt truth.")
-    parser.add_argument("--truth", default="x6812b.txt", help="Path to source of truth file")
+    parser = argparse.ArgumentParser(description="Audit and filter blobs against x6812.txt truth.")
+    parser.add_argument("--truth", default="x6812.txt", help="Path to source of truth file")
     parser.add_argument("--prop", default="proprietary-files.txt", help="Path to proprietary-files.txt")
     parser.add_argument("--extract", default="extract-files.py", help="Path to extract-files.py")
     parser.add_argument("--remove", action="store_true", help="Remove all commented out or missing lines")

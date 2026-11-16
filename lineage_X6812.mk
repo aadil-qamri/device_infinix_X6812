@@ -9,16 +9,16 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/core_64_bit.mk)
 $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base_telephony.mk)
 
 # Inherit from device makefile
-$(call inherit-product, device/infinix/X6812B/device.mk)
+$(call inherit-product, device/infinix/X6812/device.mk)
 
 # Inherit some common crDroid stuff.
 $(call inherit-product, vendor/lineage/config/common_full_phone.mk)
 
 # Device identifier. This must come after all inclusions.
-PRODUCT_NAME := lineage_X6812B
-PRODUCT_DEVICE := X6812B
+PRODUCT_NAME := lineage_X6812
+PRODUCT_DEVICE := X6812
 PRODUCT_BRAND := infinix
-PRODUCT_MODEL := Infinix X6812B
+PRODUCT_MODEL := Infinix X6812
 PRODUCT_MANUFACTURER := infinix
 
 PRODUCT_GMS_CLIENTID_BASE := android-transsion

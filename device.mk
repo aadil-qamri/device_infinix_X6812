@@ -4,13 +4,13 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 
-DEVICE_PATH := device/infinix/X6812B
+DEVICE_PATH := device/infinix/X6812
 
 # Installs gsi keys into ramdisk, to boot a developer GSI with verified boot.
 $(call inherit-product, $(SRC_TARGET_DIR)/product/developer_gsi_keys.mk)
 
 # Call proprietary blob setup
-$(call inherit-product, vendor/infinix/X6812B/X6812B-vendor.mk)
+$(call inherit-product, vendor/infinix/X6812/X6812-vendor.mk)
 
 PRODUCT_SHIPPING_API_LEVEL := 30
 

@@ -76,7 +76,7 @@
 - `device/mediatek/sepolicy_vndr` `base/vendor/file_contexts` already labels
   `android\.hardware\.usb@1\.[0-9]+-service-mediatek` as `mtk_hal_usb_exec`.
 - After switching HALs, delete any stale `android.hardware.usb@*` fragment left
-  under `out/target/product/X6812B/vendor/etc/vintf/manifest/` before running
+  under `out/target/product/X6812/vendor/etc/vintf/manifest/` before running
   `checkvintf --check-one` — a leftover of the other version conflicts as
   duplicate FqInstance.
 

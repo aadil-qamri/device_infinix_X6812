@@ -49,7 +49,7 @@ ro.product.property_source_order=odm,vendor,product,system
 
 # Product
 ro.board.platform=mt6768
-ro.product.board=Infinix-X6812B
+ro.product.board=Infinix-X6812
 
 # System
 persist.sys.binary_xml=false

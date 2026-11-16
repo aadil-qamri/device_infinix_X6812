@@ -39,7 +39,7 @@ PY
 cd "$ROOT" || exit 1
 
 for spec in \
-    "vendor_sepolicy.conf|$ROOT/out/soong/.intermediates/system/sepolicy/vendor_sepolicy.conf/android_common/X6812B/vendor_sepolicy.conf|-C -M" \
+    "vendor_sepolicy.conf|$ROOT/out/soong/.intermediates/system/sepolicy/vendor_sepolicy.conf/android_common/X6812/vendor_sepolicy.conf|-C -M" \
     "sepolicy_neverallows.checkpolicy.conf|$ROOT/out/soong/.intermediates/system/sepolicy/sepolicy_neverallows.checkpolicy.conf/android_common/sepolicy_neverallows.checkpolicy.conf|-M"
 do
     module="${spec%%|*}"

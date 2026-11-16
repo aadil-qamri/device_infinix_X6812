@@ -1,26 +1,26 @@
 # AGENTS.md
 
-Guidance for coding agents working on the Infinix X6812B (MT6768) LineageOS device tree.
+Guidance for coding agents working on the Infinix X6812 (MT6768) LineageOS device tree.
 
 ## Project overview
 
 - Target: LineageOS 22.2 (Android 15 QPR2, release `bp1a`), userdebug.
 - SoC: MediaTek MT6768 (Helio G85 class), kernel 4.14.186, aarch64 + 32-bit.
 - `$ANDROID_ROOT` is `../../..` from this tree (`/home/rd/lineage`).
-- Stock dump: `/home/rd/Projects/android/custom-rom/x6812b/Infinix-Hot-11S-NFC-X6812B-30`
+- Stock dump: `<path to the X6812 stock dump>`
 - Tree history: forked from `realme_RMX2020`, sepolicy replaced from mt6781 X670 (`9529c41`).
 
 Key paths:
-- `device/infinix/X6812B` (this tree) | `device/infinix/X6812B-kernel` (prebuilt Image.gz, DTB, headers)
+- `device/infinix/X6812` (this tree) | `device/infinix/X6812-kernel` (prebuilt Image.gz, DTB, headers)
 - `hardware/mediatek` (shared MTK HALs) | `device/mediatek/sepolicy_vndr` (shared MTK sepolicy)
-- `vendor/infinix/X6812B` (generated — never edit)
+- `vendor/infinix/X6812` (generated — never edit)
 
 ## Hard rules (Non-negotiable)
 
 1. **Never run a build.** Ask user to build and report `out/error.log`.
 2. **Never propose "rebuild the kernel" as a fix.** Kernel source is unavailable; prebuilt only.
 3. **Never run `grep`/`rg` at `$ANDROID_ROOT` or on `out/`.** Scope to specific subdirectories.
-4. **Never edit AOSP/Lineage source or `vendor/infinix/X6812B`.** Fixes belong in this tree.
+4. **Never edit AOSP/Lineage source or `vendor/infinix/X6812`.** Fixes belong in this tree.
 5. **Never `git reset --hard`.** Use `git checkout -- <path>` only on touched files.
 6. **No explanatory comments in code/config files.** Put reasoning in commit messages.
 7. **Check AOSP and MediaTek upstream before adding anything.** Avoid duplicate configs/props/services.
@@ -46,7 +46,7 @@ Key paths:
 
 ```bash
 # Regenerate vendor tree after ANY proprietary-files.txt change (must finish before building)
-./extract-files.py /home/rd/Projects/android/custom-rom/x6812b/Infinix-Hot-11S-NFC-X6812B-30
+./extract-files.py <path to the X6812 stock dump>
 
 # Refresh pinned-blob sha1s (must leave `git diff` clean on second run)
 python3 update-sha1sums.py
@@ -66,7 +66,7 @@ python3 update-sha1sums.py
 
 ## Commit style
 
-Structure: `<codename>: <subsystem>: <summary>` (e.g. `X6812B: wifi: enable WPA3-SAE softap support`).
+Structure: `<codename>: <subsystem>: <summary>` (e.g. `X6812: wifi: enable WPA3-SAE softap support`).
 1. Subject line: imperative, concise.
 2. Log snippet: verbatim error, logcat trace, or failing command output showing the bug/repro.
 3. Explanation: root cause, what was verified on hardware vs assumed, and why the chosen fix is correct.

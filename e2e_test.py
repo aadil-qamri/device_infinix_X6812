@@ -202,7 +202,7 @@ class DeviceTester:
             self.failures += 1
 
     def run_all(self):
-        print(f"{BOLD}=== Starting E2E Verification for Infinix X6812B ==={RESET}\n")
+        print(f"{BOLD}=== Starting E2E Verification for Infinix X6812 ==={RESET}\n")
         self.test_boot_and_system()
         print()
         self.test_battery_and_health()
@@ -233,7 +233,7 @@ class DeviceTester:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="End-to-end device service tester for X6812B")
+    parser = argparse.ArgumentParser(description="End-to-end device service tester for X6812")
     parser.add_argument("-s", "--serial", help="Device serial number (ADB -s)")
     args = parser.parse_args()
 

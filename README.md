@@ -1,1 +1,1 @@
-# Infinix HOT 11S NFC Device Tree (X6812B)
+# Infinix HOT 11S Device Tree (X6812)

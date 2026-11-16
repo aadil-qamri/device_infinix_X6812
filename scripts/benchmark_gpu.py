@@ -196,7 +196,7 @@ def run_benchmark(duration_sec=15, port=8089, unthrottled=False):
     print("=" * 55 + "\n")
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Deterministic 3D GPU Gaming Benchmark for Infinix X6812B')
+    parser = argparse.ArgumentParser(description='Deterministic 3D GPU Gaming Benchmark for Infinix X6812')
     parser.add_argument('--duration', type=int, default=15, help='Benchmark duration in seconds (default: 15)')
     parser.add_argument('--port', type=int, default=8089, help='Local server port (default: 8089)')
     parser.add_argument('--unthrottled', action='store_true', help='Run unthrottled beyond 90Hz VSYNC cap (pure GPU throughput benchmark)')

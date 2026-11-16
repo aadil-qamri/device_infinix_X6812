@@ -26,7 +26,7 @@ from extract_utils.utils import (
 )
 
 namespace_imports = [
-    'device/infinix/X6812B',
+    'device/infinix/X6812',
     'hardware/mediatek',
     'hardware/mediatek/libaedv',
     'hardware/mediatek/libmtkperf_client',
@@ -155,7 +155,7 @@ blob_fixups: blob_fixups_user_type = {
 }  # fmt: skip
 
 module = ExtractUtilsModule(
-    'X6812B',
+    'X6812',
     'infinix',
     blob_fixups=blob_fixups,
     lib_fixups=lib_fixups,
