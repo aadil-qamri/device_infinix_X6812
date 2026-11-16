@@ -63,6 +63,7 @@ python3 update-sha1sums.py
 - `docs/playbooks/subsystems.md`: Subsystem specifics for Audio, Wi-Fi/Tethering, USB/Ports,
   Telephony/RIL, Battery/Charging, Display/Refresh Rate, Touch/DT2W, Offline Charging, Sensors, UI
   Jank/Benchmarking/Offsets, and Camera/Codec2.
+- `docs/x6812-port.md`: Open items from the X6812B fork that need the X6812 stock dump or device.
 
 ## Commit style
 
