@@ -1173,7 +1173,6 @@ vendor/lib/libthermalalgo.so
 vendor/lib64/libmtcloader.so
 
 # Trusted Execution Environment (TEE)
-vendor/bin/tee
 vendor/bin/teei_daemon
 vendor/etc/init/microtrust.bp_kmsetkey_ca.rc
 vendor/etc/init/microtrust.rc
