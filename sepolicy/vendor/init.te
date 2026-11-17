@@ -2,7 +2,6 @@ allow init sysfs_devices_block:file rw_file_perms;
 allow init sysfs_OTG_CTL_file:file rw_file_perms;
 allow init tranfs_block_device:blk_file { read relabelto };
 allow init tranfs_block_device:lnk_file { getattr read relabelto };
-allow init trustonic_kmsetkey_ca_exec:file execute;
 allow init socket_device:sock_file { create write };
 
 get_prop(init, vendor_mtk_service_nvram_restore_prop)

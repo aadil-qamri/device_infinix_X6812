@@ -36,6 +36,3 @@ vendor.silead.fp.ext.                          u:object_r:vendor_silead_fp_prop:
 
 # Key manager
 ro.vendor.mtk_key_manager_support                  u:object_r:vendor_mtk_default_prop:s0
-
-# TEE property
-vendor.tee.googlekey.status                          u:object_r:vendor_mtk_trustonic_tee_prop:s0
