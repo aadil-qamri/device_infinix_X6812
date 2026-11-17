@@ -24,8 +24,8 @@ PRODUCT_MANUFACTURER := infinix
 PRODUCT_GMS_CLIENTID_BASE := android-transsion
 
 PRODUCT_BUILD_PROP_OVERRIDES += \
-    BuildDesc="vnd_x6812_h6912-user 11 RP1A.200720.011 758234 release-keys" \
-    BuildFingerprint=Infinix/X6812B-OP/Infinix-X6812B:11/RP1A.200720.011/241127V533:user/release-keys \
+    BuildDesc="sys_tssi_64_infinix-user 11 RP1A.200720.011 435920 release-keys" \
+    BuildFingerprint=Infinix/X6812-GL/Infinix-X6812:11/RP1A.200720.011/230921V810:user/release-keys \
     SystemName=$(PRODUCT_SYSTEM_NAME) \
     DeviceProduct=$(PRODUCT_SYSTEM_NAME)
 

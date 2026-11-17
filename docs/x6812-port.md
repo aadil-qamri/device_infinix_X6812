@@ -22,9 +22,6 @@ stock dump or the device, and was deliberately not guessed.
 
 - `TARGET_BOOTLOADER_BOARD_NAME` in `BoardConfig.mk` and `ro.product.board` in
   `configs/props/system.prop` were renamed mechanically.
-- `BuildFingerprint` in `lineage_X6812.mk` and the header of
-  `proprietary-firmware.txt` still carry the X6812B stock fingerprint.
-- `BuildDesc` in `lineage_X6812.mk` has not been compared with the X6812 stock build.
 
 ### Diff against X6812 stock
 
