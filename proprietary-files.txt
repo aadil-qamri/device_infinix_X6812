@@ -676,7 +676,7 @@ vendor/lib64/libmtk_drvb.so
 vendor/lib64/libpixelflinger.so
 vendor/lib64/vendor.mediatek.hardware.dfps@1.0.so
 
-# Display (Picture Quality) 
+# Display (Picture Quality)
 vendor/bin/hw/vendor.mediatek.hardware.pq@2.2-service
 vendor/etc/init/vendor.mediatek.hardware.pq@2.2-service.rc
 vendor/lib/hw/vendor.mediatek.hardware.pq@2.6-impl.so
@@ -819,7 +819,9 @@ vendor/lib64/vendor.mediatek.hardware.lbs@1.0.so
 
 # Gatekeeper
 vendor/lib/hw/libSoftGatekeeper.so;SYMLINK=vendor/lib/hw/gatekeeper.default.so
+vendor/lib/hw/android.hardware.gatekeeper@1.0-impl.so
 vendor/lib64/hw/libSoftGatekeeper.so;SYMLINK=vendor/lib64/hw/gatekeeper.default.so
+vendor/lib64/hw/android.hardware.gatekeeper@1.0-impl.so
 
 # Health
 vendor/bin/fuelgauged
@@ -1025,7 +1027,7 @@ vendor/lib/vendor.mediatek.hardware.power@2.0.so
 vendor/lib64/vendor.mediatek.hardware.power@1.1.so
 vendor/lib64/vendor.mediatek.hardware.power@2.0.so
 
-# Radio 
+# Radio
 vendor/bin/bip
 vendor/bin/ccci_fsd
 vendor/bin/ccci_mdinit

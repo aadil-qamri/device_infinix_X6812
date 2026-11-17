@@ -1,7 +1,7 @@
 # Unpinned blobs from Infinix/X6812B-OP/Infinix-X6812B:11/RP1A.200720.011/241127V533:user/release-keys
 
 gz.img;AB
-lk.img;AB|0ce70b54d55b9d4ead22734fc59b8e63c768b4c2
+lk.img;AB
 logo.bin:logo.img;AB
 md1img.img;AB
 preloader_x6812_h6912.bin:preloader_raw.img;AB
