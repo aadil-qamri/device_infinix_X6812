@@ -876,6 +876,11 @@ vendor/lib/vendor.mediatek.hardware.keymaster_attestation@1.0.so
 vendor/lib/vendor.mediatek.hardware.keymaster_attestation@1.1.so
 vendor/lib64/hw/kmsetkey.beanpod.so;SYMLINK=vendor/lib64/hw/kmsetkey.default.so
 vendor/lib64/libkmsetkey.so
+vendor/lib64/libkeymaster4.so:vendor/lib64/libkeymaster4-v30.so;FIX_SONAME
+vendor/lib64/libkeymaster4support.so:vendor/lib64/libkeymaster4support-v30.so;FIX_SONAME
+vendor/lib64/libkeymaster_messages.so:vendor/lib64/libkeymaster_messages-v30.so;FIX_SONAME
+vendor/lib64/libkeymaster_portable.so:vendor/lib64/libkeymaster_portable-v30.so;FIX_SONAME
+vendor/lib64/libpuresoftkeymasterdevice.so:vendor/lib64/libpuresoftkeymasterdevice-v30.so;FIX_SONAME
 vendor/lib64/vendor.mediatek.hardware.keymaster_attestation@1.0.so
 vendor/lib64/vendor.mediatek.hardware.keymaster_attestation@1.1.so
 

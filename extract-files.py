@@ -74,6 +74,19 @@ blob_fixups: blob_fixups_user_type = {
     ): blob_fixup()
         .replace_needed('libprotobuf-cpp-lite-3.9.1.so', 'libprotobuf-cpp-full-3.9.1.so')
         .add_needed('libcrypto_shim.so'),
+    (
+        'vendor/bin/hw/android.hardware.keymaster@4.0-service.beanpod',
+        'vendor/lib64/libkeymaster4-v30.so',
+        'vendor/lib64/libkeymaster4support-v30.so',
+        'vendor/lib64/libkeymaster_messages-v30.so',
+        'vendor/lib64/libkeymaster_portable-v30.so',
+        'vendor/lib64/libpuresoftkeymasterdevice-v30.so',
+    ): blob_fixup()
+        .replace_needed('libkeymaster4.so', 'libkeymaster4-v30.so')
+        .replace_needed('libkeymaster4support.so', 'libkeymaster4support-v30.so')
+        .replace_needed('libkeymaster_messages.so', 'libkeymaster_messages-v30.so')
+        .replace_needed('libkeymaster_portable.so', 'libkeymaster_portable-v30.so')
+        .replace_needed('libpuresoftkeymasterdevice.so', 'libpuresoftkeymasterdevice-v30.so'),
     'vendor/lib64/libudf.so': blob_fixup()
         .add_needed('libshim_unwindstack.so'),
     (
