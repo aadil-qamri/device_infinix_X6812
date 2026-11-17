@@ -240,9 +240,9 @@ ro.vendor.sim_refresh_reset_by_modem=1
 telephony.active_modems.max_count=2
 
 # TEE
-ro.hardware.kmsetkey=trustonic
+ro.hardware.kmsetkey=beanpod
 ro.vendor.mtk_tee_gp_support=1
-ro.vendor.mtk_trustonic_tee_support=1
+ro.vendor.mtk_microtrust_tee_support=1
 
 # Wifi
 persist.dbg.volte_avail_ovr=1

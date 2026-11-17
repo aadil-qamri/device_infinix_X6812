@@ -818,9 +818,7 @@ vendor/lib64/lbs_hidl_service-impl.so
 vendor/lib64/vendor.mediatek.hardware.lbs@1.0.so
 
 # Gatekeeper
-vendor/lib/hw/libMcGatekeeper.so;SYMLINK=vendor/lib/hw/gatekeeper.mt6768.so
 vendor/lib/hw/libSoftGatekeeper.so;SYMLINK=vendor/lib/hw/gatekeeper.default.so
-vendor/lib64/hw/libMcGatekeeper.so;SYMLINK=vendor/lib64/hw/gatekeeper.mt6768.so
 vendor/lib64/hw/libSoftGatekeeper.so;SYMLINK=vendor/lib64/hw/gatekeeper.default.so
 
 # Health
@@ -868,13 +866,13 @@ vendor/lib/modules/wmt_chrdev_wifi.ko
 vendor/lib/modules/wmt_drv.ko
 
 # Keymaster
-vendor/bin/hw/android.hardware.keymaster@4.0-service.trustonic
-vendor/bin/trustonic_kmsetkey_ca
-vendor/etc/init/android.hardware.keymaster@4.0-service.trustonic.rc
-vendor/lib/hw/kmsetkey.trustonic.so;SYMLINK=vendor/lib/hw/kmsetkey.default.so
+vendor/bin/hw/android.hardware.keymaster@4.0-service.beanpod
+vendor/bin/bp_kmsetkey_ca
+vendor/etc/init/android.hardware.keymaster@4.0-service.beanpod.rc
+vendor/lib/hw/kmsetkey.beanpod.so;SYMLINK=vendor/lib/hw/kmsetkey.default.so
 vendor/lib/vendor.mediatek.hardware.keymaster_attestation@1.0.so
 vendor/lib/vendor.mediatek.hardware.keymaster_attestation@1.1.so
-vendor/lib64/hw/kmsetkey.trustonic.so;SYMLINK=vendor/lib64/hw/kmsetkey.default.so
+vendor/lib64/hw/kmsetkey.beanpod.so;SYMLINK=vendor/lib64/hw/kmsetkey.default.so
 vendor/lib64/libkmsetkey.so
 vendor/lib64/vendor.mediatek.hardware.keymaster_attestation@1.0.so
 vendor/lib64/vendor.mediatek.hardware.keymaster_attestation@1.1.so
@@ -1173,53 +1171,30 @@ vendor/lib/libthermalalgo.so
 vendor/lib64/libmtcloader.so
 
 # Trusted Execution Environment (TEE)
-vendor/app/mcRegistry/020b0000000000000000000000000000.drbin
-vendor/app/mcRegistry/020b0000000000000000000000000000.tlbin
-vendor/app/mcRegistry/020f0000000000000000000000000000.drbin
-vendor/app/mcRegistry/020f0000000000000000000000000000.tlbin
-vendor/app/mcRegistry/030b0000000000000000000000000000.drbin
-vendor/app/mcRegistry/030b0000000000000000000000000000.tlbin
-vendor/app/mcRegistry/05120000000000000000000000000000.drbin
-vendor/app/mcRegistry/05120000000000000000000000000000.tlbin
-vendor/app/mcRegistry/05120000000000000000000000000001.drbin
-vendor/app/mcRegistry/05120000000000000000000000000001.tlbin
-vendor/app/mcRegistry/06090000000000000000000000000000.drbin
-vendor/app/mcRegistry/06090000000000000000000000000000.tlbin
-vendor/app/mcRegistry/0706000000000000000000000000004d.tlbin
-vendor/app/mcRegistry/07061000000000000000000000000000.tlbin
-vendor/app/mcRegistry/07150000000000000000000000000000.drbin
-vendor/app/mcRegistry/07150000000000000000000000000000.tlbin
-vendor/app/mcRegistry/07170000000000000000000000000000.drbin
-vendor/app/mcRegistry/07170000000000000000000000000000.tlbin
-vendor/app/mcRegistry/08030000000000000000000000000000.tabin
-vendor/app/mcRegistry/08040000000000000000000000003419.tabin
-vendor/app/mcRegistry/08050000000000000000000000003419.drbin
-vendor/app/mcRegistry/08050000000000000000000000003419.tlbin
-vendor/app/mcRegistry/08110000000000000000000000000000.tabin
-vendor/app/mcRegistry/09010000000000000000000000000000.tabin
-vendor/app/mcRegistry/09190000000000000000000000000000.tabin
-vendor/app/mcRegistry/511ead0a000000000000000000000000.tabin
-vendor/app/mcRegistry/9073f03a9618383bb1856eb3f990babd.drbin
-vendor/app/mcRegistry/9073f03a9618383bb1856eb3f990babd.tlbin
-vendor/app/mcRegistry/98fb95bcb4bf42d26473eae48690d7ea.tabin
-vendor/app/mcRegistry/df1edda8627911e980ae507b9d9a7e7d.tabin
-vendor/bin/hw/vendor.trustonic.tee@1.1-service
-vendor/bin/mcDriverDaemon
-vendor/etc/init/tee.rc
-vendor/etc/init/trustonic.rc
-vendor/etc/init/trustonic_kmsetkey_ca.rc
-vendor/etc/init/vendor.trustonic.tee@1.1-service.rc
-vendor/lib/libMcClient.so
+vendor/bin/tee
+vendor/bin/teei_daemon
+vendor/etc/init/microtrust.bp_kmsetkey_ca.rc
+vendor/etc/init/microtrust.rc
+vendor/lib/hw/gatekeeper.beanpod.so
+vendor/lib/hw/paytrigger.beanpod.so
 vendor/lib/libTEECommon.so
 vendor/lib/libgz_gp_client.so
 vendor/lib/libgz_uree.so
-vendor/lib64/libMcClient.so
+vendor/lib/libimsg_log.so
+vendor/lib64/hw/gatekeeper.beanpod.so
+vendor/lib64/hw/paytrigger.beanpod.so
 vendor/lib64/libTEECommon.so
 vendor/lib64/libgz_gp_client.so
 vendor/lib64/libgz_uree.so
-vendor/lib64/vendor.trustonic.tee.tui@1.0.so
-vendor/lib64/vendor.trustonic.tee@1.0.so
-vendor/lib64/vendor.trustonic.tee@1.1.so
+vendor/lib64/libimsg_log.so
+vendor/thh/ta/06bf3e2d6be3a45b05d4c67c7e8afb1f.ta
+vendor/thh/ta/7778c03fc30c4dd0a319ea29643d4d4b.ta
+vendor/thh/ta/7778c03fc30c4dd0a319ea29643d4dc0.ta
+vendor/thh/ta/93feffccd8ca11e796c7c7a21acb4932.ta
+vendor/thh/ta/c09c9c5daa504b78b0e46eda61556c3a.ta
+vendor/thh/ta/c1882f2d885e4e13a8c8e2622461b2fa.ta
+vendor/thh/ta/d91f322ad5a441d5955110eda3272fc0.ta
+vendor/thh/ta/df1edda8627911e980ae507b9d9a7e7d.ta
 
 # VNDK
 system/lib/libutils.so:vendor/lib/libutils-v30.so;FIX_SONAME
