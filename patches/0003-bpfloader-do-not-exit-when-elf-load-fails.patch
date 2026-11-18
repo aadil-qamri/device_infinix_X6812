@@ -1,0 +1,37 @@
+From: rdndds <rdndds@gmail.com>
+Date: Thu, 30 Apr 2026 09:16:38 +0700
+Subject: [PATCH 3/3] bpfloader: do not exit(121) when ELF object load fails
+
+legacyBpfLoader() treats any failure to load an ELF object as fatal: it
+sleeps 20s and exits 121. Called from the bpfloader service, which is a
+oneshot with "reboot_on_failure", that exit reboots the device.
+
+On a 4.14 kernel several programs cannot be loaded at all, so the fatal
+path is reached on every boot and the device never gets past bpfloader.
+
+Log and continue instead. Programs that did load stay pinned; the
+remaining ones are simply unavailable, which is the expected state for a
+BPF-less device.
+
+Continuing matches how individual programs are already handled: the kver
+comparison a few lines above skips unsupported entries rather than aborting.
+
+Signed-off-by: rdndds <rdndds@gmail.com>
+---
+diff --git a/loader/Loader.cpp b/loader/Loader.cpp
+index 51e9d92..970c8cb 100644
+--- a/loader/Loader.cpp
++++ b/loader/Loader.cpp
+@@ -1021,9 +1021,7 @@ void legacyBpfLoader() {
+             ALOGE("If this triggers reliably, you're probably missing kernel options or patches.");
+             ALOGE("If this triggers randomly, you might be hitting some memory allocation "
+                   "problems or startup script race.");
+-            ALOGE("--- DO NOT EXPECT SYSTEM TO BOOT SUCCESSFULLY ---");
+-            sleep(20);
+-            exit(121);
++            ALOGE("--- CONTINUING ANYWAY, BPF IS NOT USABLE ON THIS KERNEL ---");
+         }
+     }
+ }
+-- 
+2.54.0

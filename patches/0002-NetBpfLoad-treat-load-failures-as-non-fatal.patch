@@ -1,0 +1,34 @@
+From: rdndds <rdndds@gmail.com>
+Date: Wed, 29 Apr 2026 15:00:29 +0700
+Subject: [PATCH 2/2] NetBpfLoad: treat non-optional program load failures as non-fatal
+
+A failed load of a program not marked optional logs an error but falls
+through, so the enclosing loop returns a failure for the code section and
+bpfloader exits non-zero. With "reboot_on_failure reboot,bpfloader-failed"
+on the service, that reboots the device.
+
+On a 4.14 kernel several programs cannot be loaded regardless of what the
+loader does, so aborting gains nothing. Log a warning and continue.
+
+Aborting provides no recovery path here: the failing programs are
+unsupported by the kernel, so every boot would hit the same exit.
+
+Signed-off-by: rdndds <rdndds@gmail.com>
+---
+diff --git a/bpf/loader/NetBpfLoad.cpp b/bpf/loader/NetBpfLoad.cpp
+index 48ca600..cf88d92 100644
+--- a/bpf/loader/NetBpfLoad.cpp
++++ b/bpf/loader/NetBpfLoad.cpp
+@@ -1051,7 +1051,9 @@ static int loadCodeSections(const char* elfPath, vector<codeSection>& cs, const
+                           cs[i].name.c_str());
+                     continue;
+                 }
+-                ALOGE("non-optional program %s failed to load.", cs[i].name.c_str());
++                ALOGW("non-optional program %s failed to load, continuing anyway",
++                      cs[i].name.c_str());
++                continue;
+             }
+         }
+ 
+-- 
+2.54.0
